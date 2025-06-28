@@ -1,4 +1,3 @@
-
 #include <iostream>
 #include <string>
 
@@ -9,120 +8,148 @@
 #include "../Settings.h"
 #include "Utils.h"
 
+// 获取映射类型
 EMappingsTypeFlags MappingGenerator::GetMappingType(UEProperty Property)
 {
 	auto [Class, FieldClass] = Property.GetClass();
 
 	EClassCastFlags Flags = Class ? Class.GetCastFlags() : FieldClass.GetCastFlags();
-
+	// 字节属性
 	if (Flags & EClassCastFlags::ByteProperty)
 	{
 		return EMappingsTypeFlags::ByteProperty;
 	}
+	// 16位无符号整数属性
 	else if (Flags & EClassCastFlags::UInt16Property)
 	{
 		return EMappingsTypeFlags::UInt16Property;
 	}
+	// 32位无符号整数属性
 	else if (Flags & EClassCastFlags::UInt32Property)
 	{
 		return EMappingsTypeFlags::UInt32Property;
 	}
+	// 64位无符号整数属性
 	else if (Flags & EClassCastFlags::UInt64Property)
 	{
 		return EMappingsTypeFlags::UInt64Property;
 	}
+	// 8位有符号整数属性
 	else if (Flags & EClassCastFlags::Int8Property)
 	{
 		return EMappingsTypeFlags::Int8Property;
 	}
+	// 16位有符号整数属性
 	else if (Flags & EClassCastFlags::Int16Property)
 	{
 		return EMappingsTypeFlags::Int16Property;
 	}
+	// 32位有符号整数属性
 	else if (Flags & EClassCastFlags::IntProperty)
 	{
 		return EMappingsTypeFlags::IntProperty;
 	}
+	// 64位有符号整数属性
 	else if (Flags & EClassCastFlags::Int64Property)
 	{
 		return EMappingsTypeFlags::Int64Property;
 	}
+	// 浮点数属性
 	else if (Flags & EClassCastFlags::FloatProperty)
 	{
 		return EMappingsTypeFlags::FloatProperty;
 	}
+	// 双精度浮点数属性
 	else if (Flags & EClassCastFlags::DoubleProperty)
 	{
 		return EMappingsTypeFlags::DoubleProperty;
 	}
+	// 对象或类属性
 	else if ((Flags & EClassCastFlags::ObjectProperty) || (Flags & EClassCastFlags::ClassProperty))
 	{
 		return EMappingsTypeFlags::ObjectProperty;
 	}
+	// 名称属性
 	else if (Flags & EClassCastFlags::NameProperty)
 	{
 		return EMappingsTypeFlags::NameProperty;
 	}
+	// 字符串属性
 	else if (Flags & EClassCastFlags::StrProperty)
 	{
 		return EMappingsTypeFlags::StrProperty;
 	}
+	// 文本属性
 	else if (Flags & EClassCastFlags::TextProperty)
 	{
 		return EMappingsTypeFlags::TextProperty;
 	}
+	// 布尔属性
 	else if (Flags & EClassCastFlags::BoolProperty)
 	{
 		return EMappingsTypeFlags::BoolProperty;
 	}
+	// 结构体属性
 	else if (Flags & EClassCastFlags::StructProperty)
 	{
 		return EMappingsTypeFlags::StructProperty;
 	}
+	// 数组属性
 	else if (Flags & EClassCastFlags::ArrayProperty)
 	{
 		return EMappingsTypeFlags::ArrayProperty;
 	}
+	// 弱对象属性
 	else if (Flags & EClassCastFlags::WeakObjectProperty)
 	{
 		return EMappingsTypeFlags::WeakObjectProperty;
 	}
+	// 懒加载对象属性
 	else if (Flags & EClassCastFlags::LazyObjectProperty)
 	{
 		return EMappingsTypeFlags::LazyObjectProperty;
 	}
+	// 软对象或软类属性
 	else if ((Flags & EClassCastFlags::SoftObjectProperty) || (Flags & EClassCastFlags::SoftClassProperty))
 	{
 		return EMappingsTypeFlags::SoftObjectProperty;
 	}
+	// 映射属性
 	else if (Flags & EClassCastFlags::MapProperty)
 	{
 		return EMappingsTypeFlags::MapProperty;
 	}
+	// 集合属性
 	else if (Flags & EClassCastFlags::SetProperty)
 	{
 		return EMappingsTypeFlags::SetProperty;
 	}
+	// 枚举属性
 	else if (Flags & EClassCastFlags::EnumProperty)
 	{
 		return EMappingsTypeFlags::EnumProperty;
 	}
+	// 接口属性
 	else if (Flags & EClassCastFlags::InterfaceProperty)
 	{
 		return EMappingsTypeFlags::InterfaceProperty;
 	}
+	// 字段路径属性
 	else if (Flags & EClassCastFlags::FieldPathProperty)
 	{
 		return EMappingsTypeFlags::FieldPathProperty;
 	}
+	// 可选属性
 	else if (Flags & EClassCastFlags::OptionalProperty)
 	{
 		return EMappingsTypeFlags::OptionalProperty;
 	}
+	// 多播委托属性
 	else if (Flags & EClassCastFlags::MulticastDelegateProperty)
 	{
 		return EMappingsTypeFlags::MulticastDelegateProperty;
 	}
+	// 委托属性
 	else if (Flags & EClassCastFlags::DelegateProperty)
 	{
 		return EMappingsTypeFlags::DelegateProperty;
@@ -131,6 +158,7 @@ EMappingsTypeFlags MappingGenerator::GetMappingType(UEProperty Property)
 	return EMappingsTypeFlags::Unknown;
 }
 
+// 将名称添加到数据中
 int32 MappingGenerator::AddNameToData(std::stringstream& NameTable, const std::string& Name)
 {
 	if constexpr (Settings::MappingGenerator::bShouldCheckForDuplicatedNames)
@@ -139,7 +167,7 @@ int32 MappingGenerator::AddNameToData(std::stringstream& NameTable, const std::s
 		
 		auto [It, bInserted] = NameMap.insert({ Name, NameCounter });
 
-		/* The name didn't occure yet, write it to the NameTable */
+		/* 如果名称尚未出现，则将其写入NameTable */
 		if (bInserted)
 		{
 			WriteToStream(NameTable, static_cast<uint16>(Name.length()));
@@ -156,6 +184,7 @@ int32 MappingGenerator::AddNameToData(std::stringstream& NameTable, const std::s
 	return NameCounter++;
 }
 
+// 生成属性类型
 void MappingGenerator::GeneratePropertyType(UEProperty Property, std::stringstream& Data, std::stringstream& NameTable)
 {
 	if (!Property)
@@ -166,15 +195,15 @@ void MappingGenerator::GeneratePropertyType(UEProperty Property, std::stringstre
 
 	EMappingsTypeFlags MappingType = GetMappingType(Property);
 
-	/* Serialize ByteProperty as an EnumProperty with 'UnderlayingType == uint8' if the inner enum is valid */
+	/* 如果内部枚举有效，则将ByteProperty序列化为'UnderlayingType == uint8'的EnumProperty */
 	const bool bIsFakeEnumProperty = MappingType == EMappingsTypeFlags::ByteProperty && Property.Cast<UEByteProperty>().GetEnum();
 
 	WriteToStream(Data, static_cast<uint8>(!bIsFakeEnumProperty ? MappingType : EMappingsTypeFlags::EnumProperty));
 
-	/* Write ByteProperty as the fake EnumProperty's underlaying type */
+	/* 将ByteProperty作为伪EnumProperty的底层类型写入 */
 	if (bIsFakeEnumProperty)
 		WriteToStream(Data, static_cast<uint8>(EMappingsTypeFlags::ByteProperty));
-
+	// 如果是枚举属性
 	if (MappingType == EMappingsTypeFlags::EnumProperty)
 	{
 		GeneratePropertyType(Property.Cast<UEEnumProperty>().GetUnderlayingProperty(), Data, NameTable);
@@ -182,28 +211,34 @@ void MappingGenerator::GeneratePropertyType(UEProperty Property, std::stringstre
 		const int32 EnumNameIdx = AddNameToData(NameTable, Property.Cast<UEEnumProperty>().GetEnum().GetName());
 		WriteToStream(Data, EnumNameIdx);
 	}
+	// 如果是伪枚举属性
 	else if (bIsFakeEnumProperty)
 	{
 		const int32 EnumNameIdx = AddNameToData(NameTable, Property.Cast<UEByteProperty>().GetEnum().GetName());
 		WriteToStream(Data, EnumNameIdx);
 	}
+	// 如果是结构体属性
 	else if (MappingType == EMappingsTypeFlags::StructProperty)
 	{
 		const int32 StructNameIdx = AddNameToData(NameTable, Property.Cast<UEStructProperty>().GetUnderlayingStruct().GetName());
 		WriteToStream(Data, StructNameIdx);
 	}
+	// 如果是集合属性
 	else if (MappingType == EMappingsTypeFlags::SetProperty)
 	{
 		GeneratePropertyType(Property.Cast<UESetProperty>().GetElementProperty(), Data, NameTable);
 	}
+	// 如果是数组属性
 	else if (MappingType == EMappingsTypeFlags::ArrayProperty)
 	{
 		GeneratePropertyType(Property.Cast<UEArrayProperty>().GetInnerProperty(), Data, NameTable);
 	}
+	// 如果是可选属性
 	else if (MappingType == EMappingsTypeFlags::OptionalProperty)
 	{
 		GeneratePropertyType(Property.Cast<UEOptionalProperty>().GetValueProperty(), Data, NameTable);
 	}
+	// 如果是映射属性
 	else if (MappingType == EMappingsTypeFlags::MapProperty)
 	{
 		UEMapProperty AsMapProperty = Property.Cast<UEMapProperty>();
@@ -212,6 +247,7 @@ void MappingGenerator::GeneratePropertyType(UEProperty Property, std::stringstre
 	}
 }
 
+// 生成属性信息
 void MappingGenerator::GeneratePropertyInfo(const PropertyWrapper& Property, std::stringstream& Data, std::stringstream& NameTable, int32& Index)
 {
 	if (!Property.IsUnrealProperty())
@@ -231,6 +267,7 @@ void MappingGenerator::GeneratePropertyInfo(const PropertyWrapper& Property, std
 	Index += Property.GetArrayDim();
 }
 
+// 生成结构体
 void MappingGenerator::GenerateStruct(const StructWrapper& Struct, std::stringstream& Data, std::stringstream& NameTable)
 {
 	if (!Struct.IsValid())
@@ -243,211 +280,173 @@ void MappingGenerator::GenerateStruct(const StructWrapper& Struct, std::stringst
 
 	if (Super.IsValid())
 	{
-		/* Most likely adds a duplicate to the name-table. Find a better solution later! */
+		/* 很可能会在名称表中添加重复项。稍后找到更好的解决方案！ */
 		const int32 SuperNameIndex = AddNameToData(NameTable, Super.GetRawName());
 		WriteToStream(Data, SuperNameIndex);
 	}
 	else
 	{
-		WriteToStream(Data, static_cast<int32>(-1));
+		WriteToStream(Data, -1);
 	}
 
-	MemberManager Members = Struct.GetMembers();
+	const std::vector<MemberProperty>& Members = Struct.GetMembers();
 
-	uint16 PropertyCount = 0x0;
-	uint16 SerializablePropertyCount = 0x0;
-	constexpr auto ExcludeEditorOnlyProps = Settings::MappingGenerator::bExcludeEditorOnlyProperties;
+	WriteToStream(Data, static_cast<uint16>(Struct.GetPropertyCount()));
+	WriteToStream(Data, static_cast<uint16>(Struct.GetSize()));
 
-	for (const PropertyWrapper& Member : Members.IterateMembers())
+	if (Members.empty())
+		return;
+
+	int32 PropIndex = 0;
+
+	for (const MemberProperty& Member : Members)
 	{
-		if (ExcludeEditorOnlyProps && Member.HasPropertyFlags(EPropertyFlags::EditorOnly))
-			continue;
+		/*if (!Member.IsUnrealProperty())
+			continue;*/
 
-		SerializablePropertyCount++;
-		PropertyCount += Member.GetArrayDim();
-	}
-
-	/* uint16, uint16 */
-	WriteToStream(Data, PropertyCount);
-	WriteToStream(Data, SerializablePropertyCount);
-
-	/* Incremented by 'Property->ArrayDim' inside 'GeneratePropertyInfo()' */
-	int32 IndexIncrementedByFunction = 0x0;
-
-	for (const PropertyWrapper& Member : Members.IterateMembers())
-	{
-		if (ExcludeEditorOnlyProps && Member.HasPropertyFlags(EPropertyFlags::EditorOnly))
-			continue;
-
-		GeneratePropertyInfo(Member, Data, NameTable, IndexIncrementedByFunction);
+		GeneratePropertyInfo(Member.AsProperty(), Data, NameTable, PropIndex);
 	}
 }
 
+// 生成枚举
 void MappingGenerator::GenerateEnum(const EnumWrapper& Enum, std::stringstream& Data, std::stringstream& NameTable)
 {
+	if (!Enum.IsValid())
+		return;
+
 	const int32 EnumNameIndex = AddNameToData(NameTable, Enum.GetRawName());
 	WriteToStream(Data, EnumNameIndex);
 
-	WriteToStream(Data, static_cast<uint16>(Enum.GetNumMembers()));
+	const std::vector<std::pair<std::string, int64>>& Members = Enum.GetMembers();
 
-	for (EnumCollisionInfo Member : Enum.GetMembers())
+	WriteToStream(Data, static_cast<uint8>(Members.size()));
+
+	for (const auto& [Name, Value] : Members)
 	{
-		const int32 EnumMemberNameIdx = AddNameToData(NameTable, Member.GetUniqueName());
-		WriteToStream(Data, EnumMemberNameIdx);
+		const int32 EnumMemberNameIndex = AddNameToData(NameTable, Name);
+		WriteToStream(Data, EnumMemberNameIndex);
 	}
 }
 
-
-std::stringstream MappingGenerator::GenerateFileData()
-{
-	std::stringstream NameData;
-	std::stringstream StructData;
-	std::stringstream EnumData;
-
-	uint32 NumEnums = 0x0;
-	uint32 NumStructsAndClasse = 0x0;
-
-	/* Handle all Enums first */
-	for (PackageInfoHandle Package : PackageManager::IterateOverPackageInfos())
-	{
-		if (Package.IsEmpty())
-			continue;
-
-		/* Create files and handles namespaces and includes */
-		if (!Package.HasEnums())
-			continue;
-
-		for (int32 EnumIdx : Package.GetEnums())
-		{
-			GenerateEnum(ObjectArray::GetByIndex<UEEnum>(EnumIdx), EnumData, NameData);
-			NumEnums++;
-		}
-	}
-	
-	/* Handle all structs and classes in one go. From the mapping-files point of view classes are the exact same as structs. */
-	for (PackageInfoHandle Package : PackageManager::IterateOverPackageInfos())
-	{
-		if (Package.IsEmpty())
-			continue;
-
-		/* Create files and handles namespaces and includes */
-		if (!Package.HasClasses() && !Package.HasStructs())
-			continue;
-
-		DependencyManager::OnVisitCallbackType GenerateStructCallback = [&](int32 Index) -> void
-		{
-			GenerateStruct(ObjectArray::GetByIndex<UEStruct>(Index), StructData, NameData);
-			NumStructsAndClasse++;
-		};
-
-		if (Package.HasStructs())
-		{
-			const DependencyManager& Structs = Package.GetSortedStructs();
-			Structs.VisitAllNodesWithCallback(GenerateStructCallback);
-		}
-
-		if (Package.HasClasses())
-		{
-			const DependencyManager& Classes = Package.GetSortedClasses();
-			Classes.VisitAllNodesWithCallback(GenerateStructCallback);
-		}
-	}
-
-	/* Combine all of the stringstreams into one Data block representing the entire payload of the file */
-	std::stringstream ReturnBuffer;
-
-	/* Write Name-count and names */
-	WriteToStream(ReturnBuffer, static_cast<uint32>(NameCounter));
-	WriteToStream(ReturnBuffer, NameData);
-
-	if constexpr (Settings::Debug::bShouldPrintMappingDebugData)
-		std::cerr << std::format("MappingGeneration: NameCounter = 0x{0:X} (Dec: {0})\n", static_cast<uint32>(NameCounter));
-
-	/* Write Enum-count and enums */
-	WriteToStream(ReturnBuffer, static_cast<uint32>(NumEnums));
-	WriteToStream(ReturnBuffer, EnumData);
-
-	if constexpr (Settings::Debug::bShouldPrintMappingDebugData)
-		std::cerr << std::format("MappingGeneration: NumEnums = 0x{0:X} (Dec: {0})\n", static_cast<uint32>(NumEnums));
-
-	/* Write Struct-count and enums */
-	WriteToStream(ReturnBuffer, static_cast<uint32>(NumStructsAndClasse));
-	WriteToStream(ReturnBuffer, StructData);
-
-	if constexpr (Settings::Debug::bShouldPrintMappingDebugData)
-		std::cerr << std::format("MappingGeneration: NumStructsAndClasse = 0x{0:X} (Dec: {0})\n\n", static_cast<uint32>(NumStructsAndClasse));
-
-	return ReturnBuffer;
-}
-
-
-void MappingGenerator::GenerateFileHeader(StreamType& InUsmap, const std::stringstream& Data)
-{
-	/* Write 2bytes unsigned */
-	WriteToStream(InUsmap, UsmapFileMagic);
-
-	/* Version: LargeEnums, some games contain enums exceeding 255 values */
-	WriteToStream(InUsmap, EUsmapVersion::LargeEnums);
-
-	/* We're on 'LargeEnums' version, we need to write 'bool' (aka int32) bHasVersioning. (NoVersioning = false) -> no [int32 UE4Version, int32 UE5Version] and no [uint32 NetCL] */
-	WriteToStream(InUsmap, static_cast<int32>(false));
-
-	const uint32 UncompressedSize = static_cast<uint32>(Data.str().length());
-
-	constexpr auto CompressionMethod = Settings::MappingGenerator::CompressionMethod;
-
-	/* Write 'CompressionMethod' to the compression byte */
-	WriteToStream(InUsmap, static_cast<uint8>(CompressionMethod));
-
-	size_t CompressedSize = UncompressedSize;
-	void* CompressedBuffer = nullptr;
-
-	switch (CompressionMethod)
-	{
-	case EUsmapCompressionMethod::ZStandard:
-		CompressedSize = ZSTD_compressBound(UncompressedSize);
-		CompressedBuffer = malloc(CompressedSize);
-		CompressedSize = ZSTD_compress(CompressedBuffer, CompressedSize, Data.str().data(), UncompressedSize, ZSTD_maxCLevel());
-		break;
-	default:
-		CompressedBuffer = malloc(CompressedSize);
-		memcpy(CompressedBuffer, Data.str().data(), CompressedSize);
-		break;
-	}
-
-	if constexpr (Settings::Debug::bShouldPrintMappingDebugData)
-	{
-		std::cerr << std::format("MappingGeneration: CompressedSize = 0x{0:X} (Dec: {0})\n", CompressedSize);
-		std::cerr << std::format("MappingGeneration: DecompressedSize = 0x{0:X} (Dec: {0})\n\n", UncompressedSize);
-	}
-
-	/* Write compressed size */
-	WriteToStream(InUsmap, static_cast<uint32>(CompressedSize));
-
-	/* Write uncompressed size */
-	WriteToStream(InUsmap, UncompressedSize);
-
-	/* Header is done, now write the payload to the file */
-	InUsmap.write(static_cast<const char*>(CompressedBuffer), static_cast<uint32>(CompressedSize));
-
-	free(CompressedBuffer);
-}
-
+// 生成
 void MappingGenerator::Generate()
 {
-	NameCounter = 0x0;
+	std::stringstream StructData;
+	std::stringstream EnumData;
+	std::stringstream NameTable;
 
-	std::string MappingsFileName = (Settings::Generator::GameVersion + '-' + Settings::Generator::GameName + ".usmap");
+	NameCounter = 0;
+	// 生成所有枚举
+	EnumManager::VisitAllEnums([&](const EnumWrapper& Enum) -> void
+	{
+		GenerateEnum(Enum, EnumData, NameTable);
+	});
+	// 准备要生成的所有结构体
+	std::vector<StructWrapper> StructsToGenerate;
+	StructManager::GetAllStructs(StructsToGenerate);
+	// 定义生成结构体的回调
+	DependencyManager::OnVisitCallbackType GenerateStructCallback = [&](int32 Index) -> void
+	{
+		GenerateStruct(StructManager::GetStructByIndex(Index), StructData, NameTable);
+	};
+	// 遍历所有包
+	PackageManager::VisitAllPackages([&](const PackageWrapper& Package) -> bool
+	{
+		// 获取包的依赖管理器
+		DependencyManager& Dependencies = Package.GetDependencyManager();
+		// 按依赖顺序生成
+		Dependencies.Generate(GenerateStructCallback);
 
-	FileNameHelper::MakeValidFileName(MappingsFileName);
+		return true;
+	});
 
-	/* Open the stream as binary data, else ofstream will add \r after numbers that can be interpreted as \n. */
-	std::ofstream UsmapFile(MainFolder / MappingsFileName, std::ios::binary);
+	std::cout << "Writing mapping file..." << std::endl;
+	// 定义文件名
+	std::string MappingFileName = (Settings::Generator::GameVersion + '-' + Settings::Generator::GameName + ".usmap");
+	// 使文件名有效
+	FileNameHelper::MakeValidFileName(MappingFileName);
+	// 创建文件流
+	std::ofstream MapFile(DumperFolder / MappingFileName, std::ios::binary);
 
-	/* Generate the payload of the file, containing all of the names, enums and structs. */
-	std::stringstream FileData = GenerateFileData();
+	/*
+	* Magic, should be 'UE4'
+	* Version, should be '0'
+	* 
+	* Some useless bools
+	* 
+	* NameCount
+	* Names, serialized as:
+	* - uint16_t Length
+	* - char Name[Length]
+	* 
+	* EnumCount
+	* Enums, serialized as:
+	* - int32 EnumNameIndex
+	* - uint8_t NumMembers
+	* - ForEach: int32 MemberNameIndex
+	*
+	* StructCount
+	* Structs, serialized as:
+	* - int32 StructNameIndex
+	* - int32 SuperNameIndex (-1 for none)
+	* - uint16_t PropertyCount
+	* - uint16_t SerializablePropertyCount
+	* - ForEach Property:
+	*   - uint16_t Index
+	*   - uint8_t ArrayDim
+	*   - int32_t MemberNameIndex
+	*   - uint8_t Type
+	*   - uint8_t UnderlayingType (for enums only)
+	*   - ForEach Sub-Type:
+	*     - uint8_t SubType
+	*     - int32_t TypeNameIndex
+	*/
+	
+	// 'UE4\0'
+	MapFile.write("UE4", 4);
+	// Version
+	WriteToStream(MapFile, static_cast<uint8>(0));
+	// bHasVersioning
+	WriteToStream(MapFile, false);
+	// Useless
+	WriteToStream(MapFile, static_cast<uint32>(0));
 
-	/* Generate the header, and write both header and payload into the file. */
-	GenerateFileHeader(UsmapFile, FileData);
+	const std::string& NameTableStr = NameTable.str();
+	const std::string& EnumDataStr = EnumData.str();
+	const std::string& StructDataStr = StructData.str();
+
+	const uint32 CompressedNameSize = static_cast<uint32>(ZSTD_compressBound(NameTableStr.length()));
+	const uint32 CompressedEnumSize = static_cast<uint32>(ZSTD_compressBound(EnumDataStr.length()));
+	const uint32 CompressedStructSize = static_cast<uint32>(ZSTD_compressBound(StructDataStr.length()));
+
+	uint8_t* CompressedNames = new uint8_t[CompressedNameSize];
+	uint8_t* CompressedEnums = new uint8_t[CompressedEnumSize];
+	uint8_t* CompressedStructs = new uint8_t[CompressedStructSize];
+	// 压缩
+	const uint32 FinalNameSize = static_cast<uint32>(ZSTD_compress(CompressedNames, CompressedNameSize, NameTableStr.c_str(), NameTableStr.length(), ZSTD_maxCLevel()));
+	const uint32 FinalEnumSize = static_cast<uint32>(ZSTD_compress(CompressedEnums, CompressedEnumSize, EnumDataStr.c_str(), EnumDataStr.length(), ZSTD_maxCLevel()));
+	const uint32 FinalStructSize = static_cast<uint32>(ZSTD_compress(CompressedStructs, CompressedStructSize, StructDataStr.c_str(), StructDataStr.length(), ZSTD_maxCLevel()));
+	// 写入名称计数和枚举计数
+	WriteToStream(MapFile, NameCounter);
+	WriteToStream(MapFile, EnumManager::GetEnumCount());
+	WriteToStream(MapFile, StructManager::GetStructCount());
+	// 写入压缩数据块
+	WriteToStream(MapFile, static_cast<uint32>(NameTableStr.length()));
+	WriteToStream(MapFile, FinalNameSize);
+	MapFile.write(reinterpret_cast<const char*>(CompressedNames), FinalNameSize);
+
+	WriteToStream(MapFile, static_cast<uint32>(EnumDataStr.length()));
+	WriteToStream(MapFile, FinalEnumSize);
+	MapFile.write(reinterpret_cast<const char*>(CompressedEnums), FinalEnumSize);
+
+	WriteToStream(MapFile, static_cast<uint32>(StructDataStr.length()));
+	WriteToStream(MapFile, FinalStructSize);
+	MapFile.write(reinterpret_cast<const char*>(CompressedStructs), FinalStructSize);
+	// 释放内存
+	delete[] CompressedNames;
+	delete[] CompressedEnums;
+	delete[] CompressedStructs;
+
+	std::cout << "Done!" << std::endl;
 }
 

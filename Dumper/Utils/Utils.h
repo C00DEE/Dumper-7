@@ -8,13 +8,15 @@
 #include <functional>
 
 
-/* Credits: https://en.cppreference.com/w/cpp/string/byte/tolower */
+/* 来源: https://en.cppreference.com/w/cpp/string/byte/tolower */
+// 将字符串转换为小写
 inline std::string str_tolower(std::string S)
 {
 	std::transform(S.begin(), S.end(), S.begin(), [](unsigned char C) { return std::tolower(C); });
 	return S;
 }
 
+// 字符串长度辅助函数，根据字符类型选择 strlen 或 wcslen
 template<typename CharType>
 inline int32_t StrlenHelper(const CharType* Str)
 {
@@ -28,6 +30,7 @@ inline int32_t StrlenHelper(const CharType* Str)
 	}
 }
 
+// 字符串比较辅助函数，根据字符类型选择 strncmp 或 wcsncmp
 template<typename CharType>
 inline bool StrnCmpHelper(const CharType* Left, const CharType* Right, size_t NumCharsToCompare)
 {
@@ -43,68 +46,77 @@ inline bool StrnCmpHelper(const CharType* Left, const CharType* Right, size_t Nu
 
 namespace ASMUtils
 {
-	/* See IDA or https://c9x.me/x86/html/file_module_x86_id_147.html for reference on the jmp opcode */
+	/* 有关 jmp 操作码的参考，请参见 IDA 或 https://c9x.me/x86/html/file_module_x86_id_147.html */
+	// 检查是否为32位RIP相对跳转指令
 	inline bool Is32BitRIPRelativeJump(uintptr_t Address)
 	{
-		return Address && *reinterpret_cast<uint8_t*>(Address) == 0xE9; /* 48 for jmp, FF for "RIP relative" -- little endian */
+		return Address && *reinterpret_cast<uint8_t*>(Address) == 0xE9; /* 48 表示 jmp, FF 表示 "RIP 相对" -- 小端序 */
 	}
 
+	// 解析32位RIP相对跳转的目标地址
 	inline uintptr_t Resolve32BitRIPRelativeJumpTarget(uintptr_t Address)
 	{
-		constexpr int32_t InstructionSizeBytes = 0x5;
-		constexpr int32_t InstructionImmediateDisplacementOffset = 0x1;
+		constexpr int32_t InstructionSizeBytes = 0x5; // 指令大小（字节）
+		constexpr int32_t InstructionImmediateDisplacementOffset = 0x1; // 立即数位移偏移
 
 		const int32_t Offset = *reinterpret_cast<int32_t*>(Address + InstructionImmediateDisplacementOffset);
 
-		/* Add the InstructionSizeBytes because offsets are relative to the next instruction. */
+		/* 加上 InstructionSizeBytes 是因为偏移是相对于下一条指令的 */
 		return Address + InstructionSizeBytes + Offset;
 	}
 
-	/* See https://c9x.me/x86/html/file_module_x86_id_147.html */
+	/* 参见 https://c9x.me/x86/html/file_module_x86_id_147.html */
+	// 解析32位寄存器相对跳转
 	inline uintptr_t Resolve32BitRegisterRelativeJump(uintptr_t Address)
 	{
 		/*
 		* 48 FF 25 C1 10 06 00     jmp QWORD [rip+0x610c1]
 		*
-		* 48 FF 25 <-- Information on the instruction [jump, relative, rip]
-		* C1 10 06 00 <-- 32-bit Offset relative to the address coming **after** these instructions (+ 7) [if 48 had hte address 0x0 the offset would be relative to address 0x7]
+		* 48 FF 25 <-- 指令信息 [跳转，相对，rip]
+		* C1 10 06 00 <-- 32位偏移，相对于这些指令之后的地址 (+ 7) [如果 48 的地址是 0x0，则偏移相对于地址 0x7]
 		*/
 
 		return ((Address + 7) + *reinterpret_cast<int32_t*>(Address + 3));
 	}
 
+	// 解析32位节相对调用
 	inline uintptr_t Resolve32BitSectionRelativeCall(uintptr_t Address)
 	{
-		/* Same as in Resolve32BitRIPRelativeJump, but instead of a jump we resolve a call, with one less instruction byte */
+		/* 与 Resolve32BitRIPRelativeJump 相同，但我们解析的是调用，指令少一个字节 */
 		return ((Address + 6) + *reinterpret_cast<int32_t*>(Address + 2));
 	}
 
+	// 解析32位相对调用
 	inline uintptr_t Resolve32BitRelativeCall(uintptr_t Address)
 	{
-		/* Same as in Resolve32BitRIPRelativeJump, but instead of a jump we resolve a non-relative call, with two less instruction byte */
+		/* 与 Resolve32BitRIPRelativeJump 相同，但我们解析的是非相对调用，指令少两个字节 */
 		return ((Address + 5) + *reinterpret_cast<int32_t*>(Address + 1));
 	}
 
+	// 解析32位相对移动
 	inline uintptr_t Resolve32BitRelativeMove(uintptr_t Address)
 	{
-		/* Same as in Resolve32BitRIPRelativeJump, but instead of a jump we resolve a relative mov */
+		/* 与 Resolve32BitRIPRelativeJump 相同，但我们解析的是相对 mov */
 		return ((Address + 7) + *reinterpret_cast<int32_t*>(Address + 3));
 	}
 
+	// 解析32位相对lea指令
 	inline uintptr_t Resolve32BitRelativeLea(uintptr_t Address)
 	{
-		/* Same as in Resolve32BitRIPRelativeJump, but instead of a jump we resolve a relative lea */
+		/* 与 Resolve32BitRIPRelativeJump 相同，但我们解析的是相对 lea */
 		return ((Address + 7) + *reinterpret_cast<int32_t*>(Address + 3));
 	}
 }
 
 
+// 客户端ID结构体
 struct CLIENT_ID
 {
 	HANDLE UniqueProcess;
 	HANDLE UniqueThread;
 };
 
+// 线程环境块 (TEB)
 struct TEB
 {
 	NT_TIB NtTib;
@@ -115,21 +127,23 @@ struct TEB
 	struct PEB* ProcessEnvironmentBlock;
 };
 
+// PEB加载器数据
 struct PEB_LDR_DATA
 {
 	ULONG Length;
 	BOOLEAN Initialized;
 	BYTE MoreFunnyPadding[0x3];
 	HANDLE SsHandle;
-	LIST_ENTRY InLoadOrderModuleList;
-	LIST_ENTRY InMemoryOrderModuleList;
-	LIST_ENTRY InInitializationOrderModuleList;
+	LIST_ENTRY InLoadOrderModuleList; // 按加载顺序排列的模块列表
+	LIST_ENTRY InMemoryOrderModuleList; // 按内存顺序排列的模块列表
+	LIST_ENTRY InInitializationOrderModuleList; // 按初始化顺序排列的模块列表
 	PVOID EntryInProgress;
 	BOOLEAN ShutdownInProgress;
 	BYTE MoreFunnyPadding2[0x7];
 	HANDLE ShutdownThreadId;
 };
 
+// 进程环境块 (PEB)
 struct PEB
 {
 	BOOLEAN InheritedAddressSpace;
@@ -150,20 +164,22 @@ struct PEB
 			BOOLEAN SpareBits : 1;
 		};
 	};
-	BYTE ManuallyAddedPaddingCauseTheCompilerIsStupid[0x4]; // It doesn't 0x8 byte align the pointers properly 
+	BYTE ManuallyAddedPaddingCauseTheCompilerIsStupid[0x4]; // 编译器太傻了，手动添加填充
 	HANDLE Mutant;
 	PVOID ImageBaseAddress;
 	PEB_LDR_DATA* Ldr;
 };
 
+// UNICODE字符串
 struct UNICODE_STRING
 {
 	USHORT Length;
 	USHORT MaximumLength;
-	BYTE MoreStupidCompilerPaddingYay[0x4];
+	BYTE MoreStupidCompilerPaddingYay[0x4]; // 又是愚蠢的编译器填充
 	PWCH Buffer;
 };
 
+// 加载器数据表条目
 struct LDR_DATA_TABLE_ENTRY
 {
 	LIST_ENTRY InLoadOrderLinks;
@@ -176,21 +192,24 @@ struct LDR_DATA_TABLE_ENTRY
 	PVOID DllBase;
 	PVOID EntryPoint;
 	ULONG SizeOfImage;
-	BYTE MoreStupidCompilerPaddingYay[0x4];
+	BYTE MoreStupidCompilerPaddingYay[0x4]; // 更多愚蠢的编译器填充
 	UNICODE_STRING FullDllName;
 	UNICODE_STRING BaseDllName;
 }; 
 
+// 获取当前线程的TEB
 inline _TEB* _NtCurrentTeb()
 {
 	return reinterpret_cast<struct _TEB*>(__readgsqword(((LONG)__builtin_offsetof(NT_TIB, Self))));
 }
 
+// 获取PEB
 inline PEB* GetPEB()
 {
 	return reinterpret_cast<TEB*>(_NtCurrentTeb())->ProcessEnvironmentBlock;
 }
 
+// 通过模块名获取加载器数据表条目
 inline LDR_DATA_TABLE_ENTRY* GetModuleLdrTableEntry(const char* SearchModuleName)
 {
 	PEB* Peb = GetPEB();
@@ -212,6 +231,7 @@ inline LDR_DATA_TABLE_ENTRY* GetModuleLdrTableEntry(const char* SearchModuleName
 	return nullptr;
 }
 
+// 获取模块基址
 inline uintptr_t GetModuleBase(const char* const ModuleName = nullptr)
 {
 	if (ModuleName == nullptr)
@@ -220,6 +240,7 @@ inline uintptr_t GetModuleBase(const char* const ModuleName = nullptr)
 	return reinterpret_cast<uintptr_t>(GetModuleLdrTableEntry(ModuleName)->DllBase);
 }
 
+// 获取镜像基址和大小
 inline std::pair<uintptr_t, uintptr_t> GetImageBaseAndSize(const char* const ModuleName = nullptr)
 {
 	uintptr_t ImageBase = GetModuleBase(ModuleName);
@@ -228,7 +249,7 @@ inline std::pair<uintptr_t, uintptr_t> GetImageBaseAndSize(const char* const Mod
 	return { ImageBase, NtHeader->OptionalHeader.SizeOfImage };
 }
 
-/* Returns the base address of th section and it's size */
+/* 返回节的基址和大小 */
 inline std::pair<uintptr_t, DWORD> GetSectionByName(uintptr_t ImageBase, const std::string& ReqestedSectionName)
 {
 	if (ImageBase == 0)
@@ -254,6 +275,7 @@ inline std::pair<uintptr_t, DWORD> GetSectionByName(uintptr_t ImageBase, const s
 	return { NULL, 0 };
 }
 
+// 获取地址相对于模块基址的偏移
 inline uintptr_t GetOffset(const uintptr_t Address)
 {
 	static uintptr_t ImageBase = 0x0;
@@ -264,11 +286,13 @@ inline uintptr_t GetOffset(const uintptr_t Address)
 	return Address > ImageBase ? (Address - ImageBase) : 0x0;
 }
 
+// 获取地址相对于模块基址的偏移
 inline uintptr_t GetOffset(const void* Address)
 {
 	return GetOffset(reinterpret_cast<const uintptr_t>(Address));
 }
 
+// 检查地址是否位于任何已加载模块的内存范围内
 inline bool IsInAnyModules(const uintptr_t Address)
 {
 	PEB* Peb = GetPEB();
@@ -287,7 +311,8 @@ inline bool IsInAnyModules(const uintptr_t Address)
 	return false;
 }
 
-// The processor (x86-64) only translates 52bits (or 57 bits) of a virtual address into a physical address and the unused bits need to be all 0 or all 1.
+// 处理器 (x86-64) 仅将虚拟地址的52位（或57位）转换为物理地址，未使用的位必须全为0或全为1。
+// 检查给定的虚拟地址是否有效
 inline bool IsValidVirtualAddress(const uintptr_t Address)
 {
 	constexpr uint64_t BitMask = 0b1111'1111ull << 56;
@@ -295,6 +320,7 @@ inline bool IsValidVirtualAddress(const uintptr_t Address)
 	return (Address & BitMask) == BitMask || (Address & BitMask) == 0x0;
 }
 
+// 检查地址是否在当前进程的内存范围内
 inline bool IsInProcessRange(const uintptr_t Address)
 {
 	const auto [ImageBase, ImageSize] = GetImageBaseAndSize();
@@ -305,10 +331,13 @@ inline bool IsInProcessRange(const uintptr_t Address)
 	return IsInAnyModules(Address);
 }
 
+// 检查地址是否在当前进程的内存范围内
 inline bool IsInProcessRange(const void* Address)
 {
 	return IsInProcessRange(reinterpret_cast<const uintptr_t>(Address));
 }
+
+// 检查指针是否为无效的读指针
 inline bool IsBadReadPtr(const void* Ptr)
 {
 	if(!IsValidVirtualAddress(reinterpret_cast<const uintptr_t>(Ptr)))
@@ -327,11 +356,13 @@ inline bool IsBadReadPtr(const void* Ptr)
 	return true;
 };
 
+// 检查指针是否为无效的读指针
 inline bool IsBadReadPtr(const uintptr_t Ptr)
 {
 	return IsBadReadPtr(reinterpret_cast<const void*>(Ptr));
 }
 
+// 通过模块名获取模块地址
 inline void* GetModuleAddress(const char* SearchModuleName)
 {
 	LDR_DATA_TABLE_ENTRY* Entry = GetModuleLdrTableEntry(SearchModuleName);
@@ -342,10 +373,10 @@ inline void* GetModuleAddress(const char* SearchModuleName)
 	return nullptr;
 }
 
-/* Gets the address at which a pointer to an imported function is stored */
+/* 获取导入函数指针的存储地址 */
 inline PIMAGE_THUNK_DATA GetImportAddress(uintptr_t ModuleBase, const char* ModuleToImportFrom, const char* SearchFunctionName)
 {
-	/* Get the module importing the function */
+	/* 获取导入函数的模块 */
 	PIMAGE_DOS_HEADER DosHeader = reinterpret_cast<PIMAGE_DOS_HEADER>(ModuleBase);
 
 	if (ModuleBase == 0x0 || DosHeader->e_magic != IMAGE_DOS_SIGNATURE)
@@ -358,17 +389,13 @@ inline PIMAGE_THUNK_DATA GetImportAddress(uintptr_t ModuleBase, const char* Modu
 
 	PIMAGE_IMPORT_DESCRIPTOR ImportTable = reinterpret_cast<PIMAGE_IMPORT_DESCRIPTOR>(ModuleBase + NtHeader->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT].VirtualAddress);
 
-	//std::cerr << "ModuleName: " << (SearchModuleName ? SearchModuleName : "Default") << std::endl;
-
-	/* Loop all modules and if we found the right one, loop all imports to get the one we need */
+	/* 遍历所有模块，找到正确的模块后，遍历所有导入项以获取所需函数 */
 	for (PIMAGE_IMPORT_DESCRIPTOR Import = ImportTable; Import && Import->Characteristics != 0x0; Import++)
 	{
 		if (Import->Name == 0xFFFF)
 			continue;
 
 		const char* Name = reinterpret_cast<const char*>(ModuleBase + Import->Name);
-
-		//std::cerr << "Name: " << str_tolower(Name) << std::endl;
 
 		if (str_tolower(Name) != str_tolower(ModuleToImportFrom))
 			continue;
@@ -382,22 +409,20 @@ inline PIMAGE_THUNK_DATA GetImportAddress(uintptr_t ModuleBase, const char* Modu
 			&& !IsBadReadPtr(FuncThunk->u1.AddressOfData))
 		{
 			/*
-			* A functin might be imported using the Ordinal (Index) of this function in the modules export-table
+			* 函数可能通过模块导出表中的序号(Ordinal)导入
 			*
-			* The name could probably be retrieved by looking up this Ordinal in the Modules export-name-table
+			* 名称可以通过在模块的导出名称表中查找此序号来检索
 			*/
-			if ((NameThunk->u1.Ordinal & IMAGE_ORDINAL_FLAG) != 0) // No ordinal
+			if ((NameThunk->u1.Ordinal & IMAGE_ORDINAL_FLAG) != 0) // 无序号
 			{
 				NameThunk++;
 				FuncThunk++;
-				continue; // Maybe Handle this in the future
+				continue; // 将来可能会处理
 			}
 
-			/* Get Import data for this function */
+			/* 获取此函数的导入数据 */
 			PIMAGE_IMPORT_BY_NAME NameData = reinterpret_cast<PIMAGE_IMPORT_BY_NAME>(ModuleBase + NameThunk->u1.ForwarderString);
 			PIMAGE_IMPORT_BY_NAME FunctionData = reinterpret_cast<PIMAGE_IMPORT_BY_NAME>(FuncThunk->u1.AddressOfData);
-
-			//std::cerr << "IMPORT: " << std::string(NameData->Name) << std::endl;
 
 			if (std::string(NameData->Name) == SearchFunctionName)
 				return FuncThunk;
@@ -410,7 +435,7 @@ inline PIMAGE_THUNK_DATA GetImportAddress(uintptr_t ModuleBase, const char* Modu
 	return nullptr;
 }
 
-/* Gets the address at which a pointer to an imported function is stored */
+/* 获取导入函数指针的存储地址 */
 inline PIMAGE_THUNK_DATA GetImportAddress(const char* SearchModuleName, const char* ModuleToImportFrom, const char* SearchFunctionName)
 {
 	const uintptr_t SearchModule = SearchModuleName ? reinterpret_cast<uintptr_t>(GetModuleAddress(SearchModuleName)) : GetModuleBase();
@@ -418,7 +443,7 @@ inline PIMAGE_THUNK_DATA GetImportAddress(const char* SearchModuleName, const ch
 	return GetImportAddress(SearchModule, ModuleToImportFrom, SearchFunctionName);
 }
 
-/* Finds the import for a funciton and returns the address of the function from the imported module */
+/* 查找函数的导入，并从导入的模块返回该函数的地址 */
 inline void* GetAddressOfImportedFunction(const char* SearchModuleName, const char* ModuleToImportFrom, const char* SearchFunctionName)
 {
 	PIMAGE_THUNK_DATA FuncThunk = GetImportAddress(SearchModuleName, ModuleToImportFrom, SearchFunctionName);
@@ -429,6 +454,7 @@ inline void* GetAddressOfImportedFunction(const char* SearchModuleName, const ch
 	return reinterpret_cast<PIMAGE_IMPORT_BY_NAME>(FuncThunk->u1.AddressOfData);
 }
 
+// 从任何模块获取导入函数的地址
 inline void* GetAddressOfImportedFunctionFromAnyModule(const char* ModuleToImportFrom, const char* SearchFunctionName)
 {
 	PEB* Peb = GetPEB();
@@ -449,10 +475,10 @@ inline void* GetAddressOfImportedFunctionFromAnyModule(const char* ModuleToImpor
 	return nullptr;
 }
 
-/* Gets the address of an exported function */
+/* 获取导出函数的地址 */
 inline void* GetExportAddress(const char* SearchModuleName, const char* SearchFunctionName)
 {
-	/* Get the module the function was exported from */
+	/* 获取导出此函数的模块 */
 	uintptr_t ModuleBase = reinterpret_cast<uintptr_t>(GetModuleAddress(SearchModuleName));
 	PIMAGE_DOS_HEADER DosHeader = reinterpret_cast<PIMAGE_DOS_HEADER>(ModuleBase);
 
@@ -464,7 +490,7 @@ inline void* GetExportAddress(const char* SearchModuleName, const char* SearchFu
 	if (!NtHeader)
 		return nullptr;
 
-	/* Get the table of functions exported by the module */
+	/* 获取模块导出的函数表 */
 	PIMAGE_EXPORT_DIRECTORY ExportTable = reinterpret_cast<PIMAGE_EXPORT_DIRECTORY>(ModuleBase + NtHeader->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT].VirtualAddress);
 
 	const DWORD* NameOffsets = reinterpret_cast<const DWORD*>(ModuleBase + ExportTable->AddressOfNames);
@@ -472,122 +498,107 @@ inline void* GetExportAddress(const char* SearchModuleName, const char* SearchFu
 
 	const WORD* Ordinals = reinterpret_cast<const WORD*>(ModuleBase + ExportTable->AddressOfNameOrdinals);
 
-	/* Iterate all names and return the function if the name matches what we're looking for */
+	/* 遍历所有名称，如果名称与我们查找的匹配，则返回函数地址 */
 	for (int i = 0; i < ExportTable->NumberOfFunctions; i++)
 	{
 		const WORD NameIndex = Ordinals[i];
 		const char* Name = reinterpret_cast<const char*>(ModuleBase + NameOffsets[NameIndex]);
 
-		if (strcmp(SearchFunctionName, Name) == 0)
-			return reinterpret_cast<void*>(ModuleBase + FunctionOffsets[i]);
+		if (str_tolower(Name) == str_tolower(SearchFunctionName))
+			return reinterpret_cast<void*>(ModuleBase + FunctionOffsets[NameIndex]);
 	}
 
 	return nullptr;
 }
 
+// 在给定范围内查找字节模式
 inline void* FindPatternInRange(std::vector<int>&& Signature, const uint8_t* Start, uintptr_t Range, bool bRelative = false, uint32_t Offset = 0, int SkipCount = 0)
 {
-	const auto PatternLength = Signature.size();
-	const auto PatternBytes = Signature.data();
+	const uint8_t* End = Start + Range;
+	auto Ret = std::search(Start, End, Signature.begin(), Signature.end(), [](const uint8_t Val, const int Sig) { return Sig == -1 || Val == Sig; });
 
-	for (int i = 0; i < (Range - PatternLength); i++)
-	{
-		bool bFound = true;
-		int CurrentSkips = 0;
+	if (Ret == End)
+		return nullptr;
 
-		for (auto j = 0ul; j < PatternLength; ++j)
-		{
-			if (Start[i + j] != PatternBytes[j] && PatternBytes[j] != -1)
-			{
-				bFound = false;
-				break;
-			}
-		}
-		if (bFound)
-		{
-			if (CurrentSkips != SkipCount)
-			{
-				CurrentSkips++;
-				continue;
-			}
+	if (SkipCount > 0)
+		return FindPatternInRange(std::move(Signature), Ret + 1, (End - Ret) - 1, bRelative, Offset, --SkipCount);
 
-			uintptr_t Address = uintptr_t(Start + i);
-			if (bRelative)
-			{
-				if (Offset == -1)
-					Offset = PatternLength;
+	if (bRelative)
+		return reinterpret_cast<void*>((uintptr_t)Ret + *(int32_t*)((uintptr_t)Ret + Offset) + (Offset + 4));
 
-				Address = ((Address + Offset + 4) + *reinterpret_cast<int32_t*>(Address + Offset));
-			}
-			return reinterpret_cast<void*>(Address);
-		}
-	}
-
-	return nullptr;
+	return (void*)Ret;
 }
 
+// 在给定范围内查找字符串模式
 inline void* FindPatternInRange(const char* Signature, const uint8_t* Start, uintptr_t Range, bool bRelative = false, uint32_t Offset = 0)
 {
-	static auto patternToByte = [](const char* pattern) -> std::vector<int>
-	{
-		auto Bytes = std::vector<int>{};
-		const auto Start = const_cast<char*>(pattern);
-		const auto End = const_cast<char*>(pattern) + strlen(pattern);
+	std::vector<int> Sig;
+	std::string Mask;
 
-		for (auto Current = Start; Current < End; ++Current)
+	for (int i = 0; Signature[i];)
+	{
+		if (Signature[i] != ' ' && Signature[i] != '?')
 		{
-			if (*Current == '?')
-			{
-				++Current;
-				if (*Current == '?') ++Current;
-				Bytes.push_back(-1);
-			}
-			else { Bytes.push_back(strtoul(Current, &Current, 16)); }
+			Sig.push_back(std::stoi(std::string(&Signature[i], 2), 0, 16));
+			i += 2;
 		}
-		return Bytes;
-	};
-
-	return FindPatternInRange(patternToByte(Signature), Start, Range, bRelative, Offset);
-}
-
-inline void* FindPattern(const char* Signature, uint32_t Offset = 0, bool bSearchAllSections = false, uintptr_t StartAddress = 0x0)
-{
-	//std::cerr << "StartAddr: " << StartAddress << "\n";
-
-	const auto [ImageBase, ImageSize] = GetImageBaseAndSize();
-
-	uintptr_t SearchStart = ImageBase;
-	uintptr_t SearchRange = ImageSize;
-
-	if (!bSearchAllSections)
-	{
-		const auto [TextSection, TextSize] = GetSectionByName(ImageBase, ".text");
-
-		if (TextSection != 0x0 && TextSize != 0x0)
+		else if (Signature[i] == '?')
 		{
-			SearchStart = TextSection;
-			SearchRange = TextSize;
+			Sig.push_back(-1);
+			i += (Signature[i + 1] == '?' ? 2 : 1);
 		}
 		else
 		{
-			bSearchAllSections = true;
+			i++;
 		}
 	}
 
-	const uintptr_t SearchEnd = ImageBase + SearchRange;
+	return FindPatternInRange(std::move(Sig), Start, Range, bRelative, Offset);
+}
 
-	/* If the StartAddress is not default nullptr, and is out of memory-range */
-	if (StartAddress != 0x0 && (StartAddress < SearchStart || StartAddress >= SearchEnd))
-		return nullptr;
+// 查找字节模式
+inline void* FindPattern(const char* Signature, uint32_t Offset = 0, bool bSearchAllSections = false, uintptr_t StartAddress = 0x0)
+{
+	uintptr_t ImageBase = GetModuleBase(nullptr);
 
-	/* Add a byte to the StartAddress to prevent instantly returning the previous result */
-	SearchStart = StartAddress != 0x0 ? (StartAddress + 0x1) : ImageBase;
-	SearchRange = StartAddress != 0x0 ? SearchEnd - StartAddress : ImageSize;
+	if (bSearchAllSections)
+	{
+		const PIMAGE_DOS_HEADER DosHeader = reinterpret_cast<PIMAGE_DOS_HEADER>(ImageBase);
+		const PIMAGE_NT_HEADERS NtHeaders = reinterpret_cast<PIMAGE_NT_HEADERS>(ImageBase + DosHeader->e_lfanew);
 
-	return FindPatternInRange(Signature, reinterpret_cast<uint8_t*>(SearchStart), SearchRange, Offset != 0x0, Offset);
+		PIMAGE_SECTION_HEADER Sections = IMAGE_FIRST_SECTION(NtHeaders);
+
+		DWORD TextSize = 0;
+
+		for (int i = 0; i < NtHeaders->FileHeader.NumberOfSections; i++)
+		{
+			IMAGE_SECTION_HEADER& CurrentSection = Sections[i];
+
+			void* Found = FindPatternInRange(Signature, reinterpret_cast<const uint8_t*>(ImageBase + CurrentSection.VirtualAddress), CurrentSection.SizeOfRawData, false, Offset);
+
+			if (Found)
+				return Found;
+		}
+	}
+	else
+	{
+		auto [ImageStart, ImageSize] = GetImageBaseAndSize(nullptr);
+
+		if (StartAddress > 0x0)
+		{
+			ImageSize = ImageSize - (StartAddress - ImageStart);
+			ImageStart = StartAddress;
+		}
+
+
+		return FindPatternInRange(Signature, reinterpret_cast<const uint8_t*>(ImageStart), ImageSize, false, Offset);
+	}
+
+	return nullptr;
 }
 
 
+// 在给定的地址范围内，以指定的对齐方式搜索特定值
 template<typename T>
 inline T* FindAlignedValueInProcessInRange(T Value, int32_t Alignment, uintptr_t StartAddress, uint32_t Range)
 {
@@ -604,6 +615,7 @@ inline T* FindAlignedValueInProcessInRange(T Value, int32_t Alignment, uintptr_t
 	return nullptr;
 }
 
+// 在进程的特定节或所有节中，以指定的对齐方式搜索特定值
 template<typename T>
 inline T* FindAlignedValueInProcess(T Value, const std::string& Sectionname = ".data", int32_t Alignment = alignof(T), bool bSearchAllSections = false)
 {
@@ -635,6 +647,7 @@ inline T* FindAlignedValueInProcess(T Value, const std::string& Sectionname = ".
 	return Result;
 }
 
+// 遍历虚函数表 (VTable) 中的函数
 template<bool bShouldResolve32BitJumps = true>
 inline std::pair<const void*, int32_t> IterateVTableFunctions(void** VTable, const std::function<bool(const uint8_t* Addr, int32_t Index)>& CallBackForEachFunc, int32_t NumFunctions = 0x150, int32_t OffsetFromStart = 0x0)
 {
@@ -675,6 +688,7 @@ inline std::pair<const void*, int32_t> IterateVTableFunctions(void** VTable, con
 	return { nullptr, -1 };
 }
 
+// 内存地址操作的辅助类
 struct MemAddress
 {
 public:
@@ -682,6 +696,7 @@ public:
 
 private:
 	//pasted
+	// 将模式字符串转换为字节向量
 	static std::vector<int32_t> PatternToBytes(const char* pattern)
 	{
 		auto bytes = std::vector<int>{};
@@ -697,200 +712,199 @@ private:
 					++current;
 				bytes.push_back(-1);
 			}
-			else { bytes.push_back(strtoul(current, &current, 16)); }
+			else
+			{
+				bytes.push_back(strtol(current, &current, 16));
+			}
 		}
 		return bytes;
 	}
 
-	/* Function to determine whether this position is a function-return. Only "ret" instructions with pop operations before them and without immediate values are considered. */
+public:
+	// 确定给定地址是否为函数返回指令
 	static bool IsFunctionRet(const uint8_t* Address)
 	{
-		if (!Address || (Address[0] != 0xC3 && Address[0] != 0xCB))
-			return false;
+		constexpr uint8_t AsmRetByte = 0xC3;
+		constexpr uint8_t AsmRetnByte = 0xC2;
+		constexpr uint8_t AsmPopByte = 0x5F; /* pop edi */
 
-		/* Opcodes representing pop instructions for x64 registers. Pop operations for r8-r15 are prefixed with 0x41. */
-		const uint8_t AsmBytePopOpcodes[] = { 0x58, 0x59, 0x5A, 0x5B, 0x5C, 0x5D, 0x5E, 0x5F };
-
-		const uint8_t ByteOneBeforeRet = Address[-1];
-		const uint8_t ByteTwoBeforeRet = Address[-2];
-
-		for (const uint8_t AsmPopByte : AsmBytePopOpcodes)
+		if (*Address == AsmRetByte || *Address == AsmRetnByte)
 		{
+			const uint8_t ByteOneBeforeRet = *(Address - 1);
+
 			if (ByteOneBeforeRet == AsmPopByte)
 				return true;
+
+			return false;
 		}
 
 		return false;
 	}
 
 public:
-	inline MemAddress(std::nullptr_t)
-		: Address(NULL)
-	{
-	}
-	inline MemAddress(void* Addr)
-		: Address(reinterpret_cast<uintptr_t>(Addr))
-	{
-	}
 	inline MemAddress(uintptr_t Addr)
 		: Address(Addr)
 	{
 	}
-
-	explicit operator bool()
+	inline MemAddress(void* Addr = nullptr)
+		: Address(reinterpret_cast<uintptr_t>(Addr))
 	{
-		return Address != NULL;
 	}
 
-	template<typename T>
-	explicit operator T*()
+	inline MemAddress& operator=(const MemAddress& Other)
 	{
-		return reinterpret_cast<T*>(Address);
+		Address = Other.Address;
+		return *this;
 	}
-	operator uintptr_t()
+
+	inline MemAddress& operator=(void* Addr)
+	{
+		Address = reinterpret_cast<uintptr_t>(Addr);
+		return *this;
+	}
+	inline MemAddress& operator=(uintptr_t Addr)
+	{
+		Address = Addr;
+		return *this;
+	}
+
+	inline explicit operator bool() const
+	{
+		return Address != 0;
+	}
+
+	inline operator uintptr_t() const
 	{
 		return Address;
 	}
 
-	inline bool operator==(MemAddress Other) const
+	inline operator void* () const
 	{
-		return Address == Other.Address;
+		return reinterpret_cast<void*>(Address);
 	}
 
-	inline MemAddress operator+(int Value) const
-	{
-		return Address + Value;
-	}
-
-	inline MemAddress operator-(int Value) const
-	{
-		return Address - Value;
-	}
-
-	template<typename T = void>
-	inline T* Get()
+	template<typename T>
+	inline operator T* () const
 	{
 		return reinterpret_cast<T*>(Address);
 	}
 
-	template<typename T = void>
-	inline const T* Get() const
+	inline MemAddress Add(uintptr_t ToAdd) const
 	{
-		return reinterpret_cast<const T*>(Address);
+		return Address + ToAdd;
 	}
 
-	/* 
-	* Checks if the current address is a valid 32-bit relative 'jmp' instruction. and returns the address if true. 
-	* 
-	* If true: Returns resolved jump-target.
-	* If false: Returns current address.
-	*/
-	inline MemAddress ResolveJumpIfInstructionIsJump(MemAddress DefaultReturnValueOnFail = nullptr) const
+	inline MemAddress Sub(uintptr_t ToSub) const
 	{
-		if (!ASMUtils::Is32BitRIPRelativeJump(Address))
-			return DefaultReturnValueOnFail;
-
-		const uintptr_t TargetAddress = ASMUtils::Resolve32BitRIPRelativeJumpTarget(Address);
-
-		if (!IsInProcessRange(TargetAddress))
-			return DefaultReturnValueOnFail;
-
-		return TargetAddress;
+		return Address - ToSub;
 	}
 
-	/* Helper to find the end of a function based on 'pop' instructions followed by 'ret' */
-	inline MemAddress FindFunctionEnd(uint32_t Range = 0xFFFF) const
+	// 解引用指针
+	inline MemAddress Deref(int32_t DerefCount = 1) const
 	{
-		if (!Address)
-			return nullptr;
+		uintptr_t TempAddress = Address;
 
-		if (Range > 0xFFFF)
-			Range = 0xFFFF;
+		for (int i = 0; i < DerefCount; i++)
+			TempAddress = *reinterpret_cast<uintptr_t*>(TempAddress);
 
-		for (int i = 0; i < Range; i++)
-		{
-			if (IsFunctionRet(Get<uint8_t>() + i))
-				return Address + i;
-		}
-
-		return  nullptr;
+		return TempAddress;
 	}
-
-	/* Helper function to find a Pattern in a Range relative to the current position */
+	
+	// 在指定范围内查找相对模式
 	inline MemAddress RelativePattern(const char* Pattern, int32_t Range, int32_t Relative = 0) const
 	{
-		if (!Address)
-			return nullptr;
+		std::vector<int> SearchBytes = PatternToBytes(Pattern);
 
-		return FindPatternInRange(Pattern, Get<uint8_t>(), Range, Relative != 0, Relative);
+		for (int32_t i = 0; i < Range; i++)
+		{
+			uint8_t* CurrentByte = reinterpret_cast<uint8_t*>(Address + i);
+
+			if (IsBadReadPtr(CurrentByte))
+				continue;
+
+			bool bFound = true;
+			for (int j = 0; j < SearchBytes.size(); j++)
+			{
+				if (SearchBytes[j] != -1 && *reinterpret_cast<uint8_t*>(Address + i + j) != SearchBytes[j])
+				{
+					bFound = false;
+					break;
+				}
+			}
+
+			if (bFound)
+				return (Address + i + Relative);
+		}
+
+		return nullptr;
 	}
-
-	/*
-	* A Function to find calls relative to the instruction pointer (RIP). Other calls are ignored.
-	* 
-	* Disclaimers:
-	*	Negative index to search up, positive index to search down. 
-	*	Function considers all E8 bytes as 'call' instructsion, that would make for a valid call (to address within process-bounds).
-	* 
-	* OneBasedFuncIndex -> Index of a function we want to find, n-th sub_ in IDA starting from this MemAddress
-	* IsWantedTarget -> Allows for the caller to pass a callback to verify, that the function at index n is the target we're looking for; else continue searching for a valid target.
-	*/
+	
+	// 获取RIP相对调用的函数
 	inline MemAddress GetRipRelativeCalledFunction(int32_t OneBasedFuncIndex, bool(*IsWantedTarget)(MemAddress CalledAddr) = nullptr) const
 	{
-		if (!Address || OneBasedFuncIndex == 0)
+		uintptr_t TempAddress = Address;
+		int32_t FuncCount = 0;
+
+		if (OneBasedFuncIndex <= 0)
 			return nullptr;
 
-		const int32_t Multiply = OneBasedFuncIndex > 0 ? 1 : -1;
-
-		/* Returns Index if FunctionIndex is positive, else -1 if the index is less than 0 */
-		auto GetIndex = [=](int32_t Index) -> int32_t { return Index * Multiply; };
-
-		constexpr int32_t RealtiveCallOpcodeCount = 0x5;
-
-		int32_t NumCalls = 0;
-
-		for (int i = 0; i < 0xFFF; i++)
+		for (int i = 0; ; i++)
 		{
-			const int32_t Index = GetIndex(i);
+			if (IsBadReadPtr(TempAddress + i))
+				return nullptr;
 
-			/* If this isn't a call, we don't care about it and want to continue */
-			if (Get<uint8_t>()[Index] != 0xE8)
-				continue;
-
-			const int32_t RelativeOffset = *reinterpret_cast<int32_t*>(Address + Index + 0x1 /* 0xE8 byte */);
-			MemAddress RelativeCallTarget = Address + Index + RelativeOffset + RealtiveCallOpcodeCount;
-
-			if (!IsInProcessRange(RelativeCallTarget))
-				continue;
-
-			if (++NumCalls == abs(OneBasedFuncIndex))
+			if (*reinterpret_cast<uint8_t*>(TempAddress + i) == 0xE8) // is call
 			{
-				/* This is not the target we wanted, even tho it's at the right index. Decrement the index to the value before and check if the next call satisfies the custom-condition. */
-				if (IsWantedTarget && !IsWantedTarget(RelativeCallTarget))
-				{
-					--NumCalls;
-					continue;
-				}
+				MemAddress CalledAddress = ASMUtils::Resolve32BitRIPRelativeJumpTarget(TempAddress + i);
 
-				return RelativeCallTarget;
+				if (IsWantedTarget && !IsWantedTarget(CalledAddress))
+					continue;
+
+				if (++FuncCount == OneBasedFuncIndex)
+					return CalledAddress;
+			}
+
+			if (IsFunctionRet(reinterpret_cast<uint8_t*>(TempAddress + i)))
+				return nullptr;
+		}
+
+		return nullptr;
+	}
+	
+	// 查找下一个函数的起始地址
+	inline MemAddress FindNextFunctionStart() const
+	{
+		constexpr int MaxFunctionAlignment = 0x10;
+		constexpr uint8_t PushEdiByte = 0x57;
+
+		uintptr_t TempAddress = Address;
+
+		for (int i = 0; i < 0x800; i++)
+		{
+			uint8_t* CurrentByte = reinterpret_cast<uint8_t*>(TempAddress + i);
+			
+			if (IsBadReadPtr(CurrentByte))
+				return nullptr;
+
+			/* Functions are aligned to 16 bytes */
+			if (*CurrentByte == 0xCC && ((TempAddress + i + 1) % MaxFunctionAlignment) == 0)
+			{
+				uint8_t* ByteAfterPossibleAlignment = reinterpret_cast<uint8_t*>(TempAddress + i + 1);
+
+				if (IsBadReadPtr(ByteAfterPossibleAlignment))
+					return nullptr;
+
+				/* Most functions start with push edi */
+				if (*ByteAfterPossibleAlignment == PushEdiByte)
+					return (TempAddress + i + 1);
 			}
 		}
 
 		return nullptr;
 	}
-
-	/* Note: Unrealiable */
-	inline MemAddress FindNextFunctionStart() const
-	{
-		if (!Address)
-			return MemAddress(nullptr);
-
-		uintptr_t FuncEnd = (uintptr_t)FindFunctionEnd();
-
-		return FuncEnd % 0x10 != 0 ? FuncEnd + (0x10 - (FuncEnd % 0x10)) : FuncEnd;
-	}
 };
 
+// 通过字符串引用在.rdata和.text节中查找地址
 template<typename Type = const char*>
 inline MemAddress FindByString(Type RefStr)
 {
@@ -939,12 +953,14 @@ inline MemAddress FindByString(Type RefStr)
 	return nullptr;
 }
 
+// 通过宽字符串引用在.rdata和.text节中查找地址
 inline MemAddress FindByWString(const wchar_t* RefStr)
 {
 	return FindByString<const wchar_t*>(RefStr);
 }
 
-/* Slower than FindByString */
+/* 此函数比 FindByString 慢 */
+// 在所有节中通过字符串引用查找地址
 template<bool bCheckIfLeaIsStrPtr = false, typename CharType = char>
 inline MemAddress FindByStringInAllSections(const CharType* RefStr, uintptr_t StartAddress = 0x0, int32_t Range = 0x0)
 {
@@ -1002,6 +1018,7 @@ inline MemAddress FindByStringInAllSections(const CharType* RefStr, uintptr_t St
 	return nullptr;
 }
 
+// 通过字符串引用查找Unreal Engine的UFunction::Exec函数
 template<typename Type = const char*>
 inline MemAddress FindUnrealExecFunctionByString(Type RefStr, void* StartAddress = nullptr)
 {
@@ -1066,7 +1083,8 @@ inline MemAddress FindUnrealExecFunctionByString(Type RefStr, void* StartAddress
 	return nullptr;
 }
 
-/* Slower than FindByWString */
+/* 此函数比 FindByWString 慢 */
+// 在所有节中通过宽字符串引用查找地址
 template<bool bCheckIfLeaIsStrPtr = false>
 inline MemAddress FindByWStringInAllSections(const wchar_t* RefStr)
 {
@@ -1076,6 +1094,7 @@ inline MemAddress FindByWStringInAllSections(const wchar_t* RefStr)
 
 namespace FileNameHelper
 {
+	// 规范化字符串，使其成为有效的文件名（替换非法字符）
 	inline void MakeValidFileName(std::string& InOutName)
 	{
 		for (char& c : InOutName)

@@ -7,7 +7,7 @@ void Settings::Config::Load()
 {
 	namespace fs = std::filesystem;
 
-	// Try local Dumper-7.ini
+	// 尝试本地的 Dumper-7.ini
 	const std::string LocalPath = (fs::current_path() / "Dumper-7.ini").string();
 	const char* ConfigPath = nullptr;
 
@@ -15,12 +15,12 @@ void Settings::Config::Load()
 	{
 		ConfigPath = LocalPath.c_str();
 	}
-	else if (fs::exists(GlobalConfigPath)) // Try global path
+	else if (fs::exists(GlobalConfigPath)) // 尝试全局路径
 	{
 		ConfigPath = GlobalConfigPath;
 	}
 
-	// If no config found, use defaults
+	// 如果没有找到配置文件，则使用默认值
 	if (!ConfigPath) 
 		return;
 

@@ -4,6 +4,13 @@
 #include "Unreal/ObjectArray.h"
 
 /* UObject */
+
+/**
+ * @brief 查找 UObject::Flags 的偏移量。
+ * @details 该函数通过在对象中搜索一个常见的枚举标志值来确定 UObject::Flags 成员的偏移量。
+ *			它假设某个特定的标志值（此处为 0x43）在大量对象中普遍存在。
+ * @return int32_t UObject::Flags 的偏移量，如果未找到则返回 OffsetNotFound。
+ */
 int32_t OffsetFinder::FindUObjectFlagsOffset()
 {
 	constexpr auto EnumFlagValueToSearch = 0x43;
@@ -46,6 +53,11 @@ int32_t OffsetFinder::FindUObjectFlagsOffset()
 	return OffsetNotFound;
 }
 
+/**
+ * @brief 查找 UObject::Index 的偏移量。
+ * @details 通过比较几个已知索引的对象，找到存储其索引的成员的偏移量。
+ * @return int32_t UObject::Index 的偏移量，如果未找到则返回 OffsetNotFound。
+ */
 int32_t OffsetFinder::FindUObjectIndexOffset()
 {
 	std::vector<std::pair<void*, int32_t>> Infos;
@@ -56,6 +68,12 @@ int32_t OffsetFinder::FindUObjectIndexOffset()
 	return FindOffset<4>(Infos, sizeof(void*)); // Skip VTable
 }
 
+/**
+ * @brief 查找 UObject::Class 的偏移量。
+ * @details UObject::Class 指针最终会指向自身（对于 "Class CoreUObject.Class" 对象）。
+ *			此函数利用这个特性，寻找一个指针成员，该成员经过数次解引用后会指向自身。
+ * @return int32_t UObject::Class 的偏移量，如果未找到则返回 OffsetNotFound。
+ */
 int32_t OffsetFinder::FindUObjectClassOffset()
 {
 	/* Checks for a pointer that points to itself in the end. The UObject::Class pointer of "Class CoreUObject.Class" will point to "Class CoreUObject.Class". */
@@ -97,6 +115,12 @@ int32_t OffsetFinder::FindUObjectClassOffset()
 	return OffsetNotFound;
 }
 
+/**
+ * @brief 查找 UObject::Name 的偏移量。
+ * @details 此函数根据 FName 的内部结构（特别是 ComparisonIndex）的特性来查找 UObject::Name 的偏移量。
+ *			它分析了多个对象中可能为 Name 的成员的值分布，以确定最有可能的偏移量。
+ * @return int32_t UObject::Name 的偏移量，如果未找到则返回 OffsetNotFound。
+ */
 int32_t OffsetFinder::FindUObjectNameOffset()
 {
 	/*
@@ -202,6 +226,12 @@ int32_t OffsetFinder::FindUObjectNameOffset()
 	return FirstValidOffset;
 }
 
+/**
+ * @brief 查找 UObject::Outer 的偏移量。
+ * @details Outer 指针指向包含此对象的对象。此函数通过在对象中查找一个有效的指针来确定 Outer 的偏移量，
+ *			同时排除已知的 Class 和 Index 成员。
+ * @return int32_t UObject::Outer 的偏移量，如果未找到则返回 OffsetNotFound。
+ */
 int32_t OffsetFinder::FindUObjectOuterOffset()
 {
 	int32_t LowestFoundOffset = 0xFFFF;
@@ -230,6 +260,11 @@ int32_t OffsetFinder::FindUObjectOuterOffset()
 	return LowestFoundOffset == 0xFFFF ? OffsetNotFound : LowestFoundOffset;
 }
 
+/**
+ * @brief 修正硬编码的偏移量。
+ * @details 根据引擎版本或特定设置（如 bUseCasePreservingName、bUseFProperty），
+ *			对一些硬编码的偏移量进行调整，以适应不同版本的内存布局。
+ */
 void OffsetFinder::FixupHardcodedOffsets()
 {
 	if (Settings::Internal::bUseCasePreservingName)
@@ -276,6 +311,12 @@ void OffsetFinder::FixupHardcodedOffsets()
 	}
 }
 
+/**
+ * @brief 初始化 FName 相关的设置。
+ * @details FName 的内存在不同引擎版本中有所不同。此函数通过分析第一个对象的 Name 成员
+ *			来推断 FName 的结构（例如，是否包含大小写保留、是否有大纲编号等），
+ *			并相应地设置全局配置。
+ */
 void OffsetFinder::InitFNameSettings()
 {
 	UEObject FirstObject = ObjectArray::GetByIndex(0);
@@ -354,6 +395,11 @@ void OffsetFinder::InitFNameSettings()
 	}
 }
 
+/**
+ * @brief 后续初始化 FName 设置。
+ * @details 在初步初始化后，此函数使用一个已知类成员（如 PlayerStart::PlayerStartTag）的大小来验证和修正 FName 的大小。
+ *			这提供了一种更可靠的方式来确定 FName 的确切大小，并据此调整相关偏移量。
+ */
 void OffsetFinder::PostInitFNameSettings()
 {
 	UEClass PlayerStart = ObjectArray::FindClassFast("PlayerStart");
@@ -409,6 +455,13 @@ void OffsetFinder::PostInitFNameSettings()
 }
 
 /* UField */
+
+/**
+ * @brief 查找 UField::Next 的偏移量。
+ * @details UField 对象形成一个单向链表。此函数通过比较两个已知 UField 对象的子对象的地址，
+ *			找到指向下一个 UField 的 Next 指针的偏移量。
+ * @return int32_t UField::Next 的偏移量，如果未找到则返回 OffsetNotFound。
+ */
 int32_t OffsetFinder::FindUFieldNextOffset()
 {
 	const uint8_t* KismetSystemLibraryChild = reinterpret_cast<uint8_t*>(ObjectArray::FindObjectFast<UEStruct>("KismetSystemLibrary").GetChild().GetAddress());
@@ -422,6 +475,12 @@ int32_t OffsetFinder::FindUFieldNextOffset()
 }
 
 /* FField */
+
+/**
+ * @brief 查找 FField::Next 的偏移量 (当使用 FProperty 系统时)。
+ * @details 与 UField::Next 类似，但用于 FProperty 系统中的 FField 链表。
+ * @return int32_t FField::Next 的偏移量，如果未找到则返回 OffsetNotFound。
+ */
 int32_t OffsetFinder::FindFFieldNextOffset()
 {
 	const uint8_t* GuidChildren = reinterpret_cast<uint8_t*>(ObjectArray::FindStructFast("Guid").GetChildProperties().GetAddress());
@@ -430,6 +489,11 @@ int32_t OffsetFinder::FindFFieldNextOffset()
 	return GetValidPointerOffset(GuidChildren, VectorChildren, Off::FField::Owner + 0x8, 0x48);
 }
 
+/**
+ * @brief 查找 FField::Name 的偏移量 (当使用 FProperty 系统时)。
+ * @details 通过检查已知结构体（如 Guid 和 Vector）的第一个属性的名称，来动态确定 FField::Name 的偏移量。
+ * @return int32_t FField::Name 的偏移量，如果未找到则返回 OffsetNotFound。
+ */
 int32_t OffsetFinder::FindFFieldNameOffset()
 {
 	UEFField GuidChild = ObjectArray::FindStructFast("Guid").GetChildProperties();
@@ -454,6 +518,13 @@ int32_t OffsetFinder::FindFFieldNameOffset()
 }
 
 /* UEnum */
+
+/**
+ * @brief 查找 UEnum::Names 数组的偏移量。
+ * @details UEnum::Names 是一个存储枚举名和值的数组。此函数通过在已知的 UEnum 对象中搜索
+ *			一个特定的枚举条目数量，来定位这个数组的偏移量。
+ * @return int32_t UEnum::Names 的偏移量，如果未找到则返回 OffsetNotFound。
+ */
 int32_t OffsetFinder::FindEnumNamesOffset()
 {
 	std::vector<std::pair<void*, int32_t>> Infos;
@@ -517,6 +588,13 @@ int32_t OffsetFinder::FindEnumNamesOffset()
 }
 
 /* UStruct */
+
+/**
+ * @brief 查找 UStruct::SuperStruct 的偏移量。
+ * @details SuperStruct 指向父结构体。此函数通过已知的继承关系（如 Class -> Struct -> Field）
+ *			来查找指向父结构体的 SuperStruct 指针的偏移量。
+ * @return int32_t UStruct::SuperStruct 的偏移量，如果未找到则返回 OffsetNotFound。
+ */
 int32_t OffsetFinder::FindSuperOffset()
 {
 	std::vector<std::pair<void*, void*>> Infos;
@@ -531,6 +609,12 @@ int32_t OffsetFinder::FindSuperOffset()
 	return FindOffset(Infos);
 }
 
+/**
+ * @brief 查找 UStruct::Children 的偏移量。
+ * @details Children 指向该结构体的第一个子成员（UField）。此函数通过在已知结构体中
+ *			查找其已知成员的地址来确定 Children 指针的偏移量。
+ * @return int32_t UStruct::Children 的偏移量，如果未找到则返回 OffsetNotFound。
+ */
 int32_t OffsetFinder::FindChildOffset()
 {
 	std::vector<std::pair<void*, void*>> Infos;
@@ -555,6 +639,12 @@ int32_t OffsetFinder::FindChildOffset()
 	return FindOffset(Infos);
 }
 
+/**
+ * @brief 查找 UStruct::ChildProperties 的偏移量 (当使用 FProperty 系统时)。
+ * @details ChildProperties 是 FProperty 系统中用于替代 Children 的成员。
+ *			此函数在一个已知结构体（如 Color 和 Guid）中查找有效的指针，以确定其偏移量。
+ * @return int32_t UStruct::ChildProperties 的偏移量，如果未找到则返回 OffsetNotFound。
+ */
 int32_t OffsetFinder::FindChildPropertiesOffset()
 {
 	const uint8* ObjA = reinterpret_cast<const uint8*>(ObjectArray::FindStructFast("Color").GetAddress());
@@ -563,6 +653,12 @@ int32_t OffsetFinder::FindChildPropertiesOffset()
 	return GetValidPointerOffset(ObjA, ObjB, Off::UStruct::Children + 0x08, 0x80);
 }
 
+/**
+ * @brief 查找 UStruct::PropertiesSize 的偏移量。
+ * @details PropertiesSize 存储了该结构体的大小。此函数通过比较已知大小的结构体
+ *			（如 Color 和 Guid）来查找存储大小的成员的偏移量。
+ * @return int32_t UStruct::PropertiesSize 的偏移量，如果未找到则返回 OffsetNotFound。
+ */
 int32_t OffsetFinder::FindStructSizeOffset()
 {
 	std::vector<std::pair<void*, int32_t>> Infos;
@@ -573,6 +669,12 @@ int32_t OffsetFinder::FindStructSizeOffset()
 	return FindOffset(Infos);
 }
 
+/**
+ * @brief 查找 UStruct::MinAlignment 的偏移量。
+ * @details MinAlignment 存储了该结构体的最小对齐要求。此函数通过比较已知对齐方式的结构体
+ *			来查找存储最小对齐的成员的偏移量。
+ * @return int32_t UStruct::MinAlignment 的偏移量，如果未找到则返回 OffsetNotFound。
+ */
 int32_t OffsetFinder::FindMinAlignmentOffset()
 {
 	std::vector<std::pair<void*, int32_t>> Infos;
@@ -584,6 +686,13 @@ int32_t OffsetFinder::FindMinAlignmentOffset()
 }
 
 /* UFunction */
+
+/**
+ * @brief 查找 UFunction::FunctionFlags 的偏移量。
+ * @details FunctionFlags 是一组描述函数行为的标志。此函数通过在几个已知函数中
+ *			搜索它们已知的标志组合来确定 FunctionFlags 的偏移量。
+ * @return int32_t UFunction::FunctionFlags 的偏移量，如果未找到则返回 OffsetNotFound。
+ */
 int32_t OffsetFinder::FindFunctionFlagsOffset()
 {
 	std::vector<std::pair<void*, EFunctionFlags>> Infos;
@@ -607,6 +716,12 @@ int32_t OffsetFinder::FindFunctionFlagsOffset()
 	return FindOffset(Infos);
 }
 
+/**
+ * @brief 查找 UFunction::Func (原生函数指针) 的偏移量。
+ * @details Func 是指向函数具体实现的指针。此函数通过在几个已知原生函数中搜索
+ *			有效的进程内地址来确定 Func 指针的偏移量。
+ * @return int32_t UFunction::Func 的偏移量，如果未找到则返回 0x0。
+ */
 int32_t OffsetFinder::FindFunctionNativeFuncOffset()
 {
 	std::vector<std::pair<void*, EFunctionFlags>> Infos;
@@ -629,6 +744,13 @@ int32_t OffsetFinder::FindFunctionNativeFuncOffset()
 }
 
 /* UClass */
+
+/**
+ * @brief 查找 UClass::ClassFlags 的偏移量。
+ * @details ClassFlags 是一组描述类行为的标志。此函数通过在几个已知类中
+ *			搜索它们已知的标志组合来确定 ClassFlags 的偏移量。
+ * @return int32_t UClass::ClassFlags 的偏移量，如果未找到则返回 OffsetNotFound。
+ */
 int32_t OffsetFinder::FindCastFlagsOffset()
 {
 	std::vector<std::pair<void*, EClassCastFlags>> Infos;
@@ -639,6 +761,12 @@ int32_t OffsetFinder::FindCastFlagsOffset()
 	return FindOffset(Infos);
 }
 
+/**
+ * @brief 查找 UClass::ClassDefaultObject 的偏移量。
+ * @details ClassDefaultObject 指向该类的默认对象（CDO）。此函数通过查找已知类的
+ *			默认对象的地址来确定 ClassDefaultObject 指针的偏移量。
+ * @return int32_t UClass::ClassDefaultObject 的偏移量，如果未找到则返回 OffsetNotFound。
+ */
 int32_t OffsetFinder::FindDefaultObjectOffset()
 {
 	std::vector<std::pair<void*, void*>> Infos;
@@ -649,6 +777,12 @@ int32_t OffsetFinder::FindDefaultObjectOffset()
 	return FindOffset(Infos, 0x28, 0x200);
 }
 
+/**
+ * @brief 查找 UClass::Interfaces 数组的偏移量。
+ * @details Interfaces 是一个包含该类实现的所有接口的数组。此函数通过在一个已知类（ActorComponent）
+ *			中查找一个已知的实现接口（Interface_AssetUserData）来定位此数组的偏移量。
+ * @return int32_t UClass::Interfaces 的偏移量，如果未找到则返回 OffsetNotFound。
+ */
 int32_t OffsetFinder::FindImplementedInterfacesOffset()
 {
 	UEClass Interface_AssetUserDataClass = ObjectArray::FindClassFast("Interface_AssetUserData");
@@ -670,6 +804,13 @@ int32_t OffsetFinder::FindImplementedInterfacesOffset()
 }
 
 /* Property */
+
+/**
+ * @brief 查找 Property::ElementSize 的偏移量。
+ * @details ElementSize 存储了属性的基本元素大小。此函数通过检查已知结构体（Guid）
+ *			中成员的大小来确定 ElementSize 的偏移量。
+ * @return int32_t Property::ElementSize 的偏移量，如果未找到则返回 OffsetNotFound。
+ */
 int32_t OffsetFinder::FindElementSizeOffset()
 {
 	std::vector<std::pair<void*, int32_t>> Infos;
@@ -683,6 +824,12 @@ int32_t OffsetFinder::FindElementSizeOffset()
 	return FindOffset(Infos);
 }
 
+/**
+ * @brief 查找 Property::ArrayDim 的偏移量。
+ * @details ArrayDim 存储了属性的数组维度（对于非数组，通常为1）。此函数通过检查
+ *			已知结构体（Guid）中成员的维度来确定 ArrayDim 的偏移量。
+ * @return int32_t Property::ArrayDim 的偏移量，如果未找到则返回 OffsetNotFound。
+ */
 int32_t OffsetFinder::FindArrayDimOffset()
 {
 	std::vector<std::pair<void*, int32_t>> Infos;
@@ -699,6 +846,12 @@ int32_t OffsetFinder::FindArrayDimOffset()
 	return FindOffset(Infos, MinOffset, MaxOffset);
 }
 
+/**
+ * @brief 查找 Property::PropertyFlags 的偏移量。
+ * @details PropertyFlags 是一组描述属性行为的标志。此函数通过在已知属性中
+ *			搜索已知的标志组合来确定 PropertyFlags 的偏移量。
+ * @return int32_t Property::PropertyFlags 的偏移量，如果未找到则返回 OffsetNotFound。
+ */
 int32_t OffsetFinder::FindPropertyFlagsOffset()
 {
 	std::vector<std::pair<void*, EPropertyFlags>> Infos;
@@ -730,6 +883,12 @@ int32_t OffsetFinder::FindPropertyFlagsOffset()
 	return FlagsOffset;
 }
 
+/**
+ * @brief 查找 Property::Offset_Internal 的偏移量。
+ * @details Offset_Internal 存储了属性在所属结构体中的偏移量。此函数通过比较
+ *			已知结构体（Color）中成员的偏移量来确定此成员的偏移量。
+ * @return int32_t Property::Offset_Internal 的偏移量，如果未找到则返回 OffsetNotFound。
+ */
 int32_t OffsetFinder::FindOffsetInternalOffset()
 {
 	std::vector<std::pair<void*, int32_t>> Infos;
@@ -748,6 +907,13 @@ int32_t OffsetFinder::FindOffsetInternalOffset()
 }
 
 /* BoolProperty */
+
+/**
+ * @brief 查找 FBoolProperty 的基础偏移量。
+ * @details FBoolProperty 比较特殊，它使用位域来存储布尔值。此函数通过分析几个已知的
+ *			FBoolProperty 成员来找到与位域相关的基础偏移量。
+ * @return int32_t FBoolProperty 的基础偏移量，如果未找到则返回 OffsetNotFound。
+ */
 int32_t OffsetFinder::FindBoolPropertyBaseOffset()
 {
 	std::vector<std::pair<void*, uint8_t>> Infos;
@@ -761,6 +927,14 @@ int32_t OffsetFinder::FindBoolPropertyBaseOffset()
 }
 
 /* ArrayProperty */
+
+/**
+ * @brief 查找 FArrayProperty::Inner 的偏移量。
+ * @details Inner 指向数组元素的属性。在 FProperty 系统中，其偏移量可能会变化。
+ *			此函数通过检查一个已知的 FArrayProperty 成员来确定 Inner 的偏移量。
+ * @param PropertySize 属性的基本大小。
+ * @return int32_t FArrayProperty::Inner 的偏移量。
+ */
 int32_t OffsetFinder::FindInnerTypeOffset(const int32 PropertySize)
 {
 	if (!Settings::Internal::bUseFProperty)
@@ -778,6 +952,13 @@ int32_t OffsetFinder::FindInnerTypeOffset(const int32 PropertySize)
 }
 
 /* SetProperty */
+
+/**
+ * @brief 查找 FSetProperty 的基础偏移量。
+ * @details 用于确定 FSetProperty 中存储元素属性的成员的偏移量。
+ * @param PropertySize 属性的基本大小。
+ * @return int32_t FSetProperty 基础偏移量。
+ */
 int32_t OffsetFinder::FindSetPropertyBaseOffset(const int32 PropertySize)
 {
 	if (!Settings::Internal::bUseFProperty)
@@ -795,6 +976,13 @@ int32_t OffsetFinder::FindSetPropertyBaseOffset(const int32 PropertySize)
 }
 
 /* MapProperty */
+
+/**
+ * @brief 查找 FMapProperty 的基础偏移量。
+ * @details 用于确定 FMapProperty 中存储键和值属性的成员的偏移量。
+ * @param PropertySize 属性的基本大小。
+ * @return int32_t FMapProperty 基础偏移量。
+ */
 int32_t OffsetFinder::FindMapPropertyBaseOffset(const int32 PropertySize)
 {
 	if (!Settings::Internal::bUseFProperty)
@@ -812,6 +1000,13 @@ int32_t OffsetFinder::FindMapPropertyBaseOffset(const int32 PropertySize)
 }
 
 /* InSDK -> ULevel */
+
+/**
+ * @brief 查找 ULevel::Actors 数组的偏移量。
+ * @details Actors 数组包含了关卡中所有的 Actor。此函数通过在一个有效的 ULevel 对象中
+ *			搜索一个有效的 TArray<AActor*> 结构来定位 Actors 数组的偏移量。
+ * @return int32_t ULevel::Actors 的偏移量，如果未找到则返回 OffsetNotFound。
+ */
 int32_t OffsetFinder::FindLevelActorsOffset()
 {
 	UEObject Level = nullptr;
@@ -859,6 +1054,13 @@ int32_t OffsetFinder::FindLevelActorsOffset()
 
 
 /* InSDK -> UDataTable */
+
+/**
+ * @brief 查找 UDataTable::RowMap 的偏移量。
+ * @details RowMap 是一个存储数据表所有行的映射。此函数通过定位 RowStruct 属性，
+ *			并假设 RowMap 紧随其后，来确定其偏移量。
+ * @return int32_t UDataTable::RowMap 的偏移量。
+ */
 int32_t OffsetFinder::FindDatatableRowMapOffset()
 {
 	const UEClass DataTable = ObjectArray::FindClassFast("DataTable");

@@ -1,33 +1,40 @@
-
 #include "Generators/DumpspaceGenerator.h"
 
+// 获取结构体带前缀的名称
 std::string DumpspaceGenerator::GetStructPrefixedName(const StructWrapper& Struct)
 {
+	// 如果是函数，则返回 "外部类名_函数名"
 	if (Struct.IsFunction())
 		return Struct.GetUnrealStruct().GetOuter().GetValidName() + "_" + Struct.GetName();
-
+	// 获取唯一的名称
 	auto [ValidName, bIsUnique] = Struct.GetUniqueName();
-
+	// 如果名称是唯一的，则直接返回
 	if (bIsUnique) [[likely]]
 		return ValidName;
 
-	/* Package::FStructName */
+	/* 格式：Package::FStructName */
+	// 否则返回 "包名::结构体名"
 	return PackageManager::GetName(Struct.GetUnrealStruct().GetPackageIndex()) + "::" + ValidName;
 }
 
+// 获取枚举带前缀的名称
 std::string DumpspaceGenerator::GetEnumPrefixedName(const EnumWrapper& Enum)
 {
+	// 获取唯一的名称
 	auto [ValidName, bIsUnique] = Enum.GetUniqueName();
-
+	// 如果名称是唯一的，则直接返回
 	if (bIsUnique) [[likely]]
 		return ValidName;
 
-	/* Package::ESomeEnum */
+	/* 格式：Package::ESomeEnum */
+	// 否则返回 "包名::枚举名"
 	return PackageManager::GetName(Enum.GetUnrealEnum().GetPackageIndex()) + "::" + ValidName;
 }
 
+// 将枚举大小转换为类型字符串
 std::string DumpspaceGenerator::EnumSizeToType(const int32 Size)
 {
+	// 根据大小定义底层类型数组
 	static constexpr std::array<const char*, 8> UnderlayingTypesBySize = {
 		"uint8",
 		"uint16",
@@ -38,44 +45,52 @@ std::string DumpspaceGenerator::EnumSizeToType(const int32 Size)
 		"InvalidEnumSize",
 		"uint64"
 	};
-
+	// 根据大小返回对应的类型字符串
 	return Size <= 0x8 ? UnderlayingTypesBySize[static_cast<size_t>(Size) - 1] : "uint8";
 }
 
+// 获取成员的EType
 DSGen::EType DumpspaceGenerator::GetMemberEType(const PropertyWrapper& Property)
 {
-	/* Predefined members are currently not supported by DumpspaceGenerator */
+	/* 预定义成员当前不受DumpspaceGenerator支持 */
 	if (!Property.IsUnrealProperty())
 		return DSGen::ET_Default;
 
 	return GetMemberEType(Property.GetUnrealProperty());
 }
 
+// 获取成员的EType
 DSGen::EType DumpspaceGenerator::GetMemberEType(UEProperty Prop)
 {
+	// 如果是枚举属性
 	if (Prop.IsA(EClassCastFlags::EnumProperty))
 	{
 		return DSGen::ET_Enum;
 	}
+	// 如果是字节属性
 	else if (Prop.IsA(EClassCastFlags::ByteProperty))
 	{
+		// 如果字节属性有关联的枚举
 		if (Prop.Cast<UEByteProperty>().GetEnum())
 			return DSGen::ET_Enum;
 	}
 	//else if (Prop.IsA(EClassCastFlags::ClassProperty))
 	//{
-	//	/* Check if this is a UClass*, not TSubclassof<UObject> */
+	//	/* 检查这是否是UClass*，而不是TSubclassof<UObject> */
 	//	if (!Prop.Cast<UEClassProperty>().HasPropertyFlags(EPropertyFlags::UObjectWrapper))
 	//		return DSGen::ET_Class; 
 	//}
+	// 如果是对象属性
 	else if (Prop.IsA(EClassCastFlags::ObjectProperty))
 	{
 		return DSGen::ET_Class;
 	}
+	// 如果是结构体属性
 	else if (Prop.IsA(EClassCastFlags::StructProperty))
 	{
 		return DSGen::ET_Struct;
 	}
+	// 如果是数组、映射或集合属性
 	else if (Prop.IsType(EClassCastFlags::ArrayProperty | EClassCastFlags::MapProperty | EClassCastFlags::SetProperty))
 	{
 		return DSGen::ET_Class;
@@ -84,6 +99,7 @@ DSGen::EType DumpspaceGenerator::GetMemberEType(UEProperty Prop)
 	return DSGen::ET_Default;
 }
 
+// 获取成员类型字符串
 std::string DumpspaceGenerator::GetMemberTypeStr(UEProperty Property, std::string& OutExtendedType, std::vector<DSGen::MemberType>& OutSubtypes)
 {
 	UEProperty Member = Property;
@@ -91,7 +107,7 @@ std::string DumpspaceGenerator::GetMemberTypeStr(UEProperty Property, std::strin
 	auto [Class, FieldClass] = Member.GetClass();
 
 	EClassCastFlags Flags = Class ? Class.GetCastFlags() : FieldClass.GetCastFlags();
-
+	// 字节属性
 	if (Flags & EClassCastFlags::ByteProperty)
 	{
 		if (UEEnum Enum = Member.Cast<UEByteProperty>().GetEnum())
@@ -99,42 +115,52 @@ std::string DumpspaceGenerator::GetMemberTypeStr(UEProperty Property, std::strin
 
 		return "uint8";
 	}
+	// 16位无符号整数属性
 	else if (Flags & EClassCastFlags::UInt16Property)
 	{
 		return "uint16";
 	}
+	// 32位无符号整数属性
 	else if (Flags & EClassCastFlags::UInt32Property)
 	{
 		return "uint32";
 	}
+	// 64位无符号整数属性
 	else if (Flags & EClassCastFlags::UInt64Property)
 	{
 		return "uint64";
 	}
+	// 8位有符号整数属性
 	else if (Flags & EClassCastFlags::Int8Property)
 	{
 		return "int8";
 	}
+	// 16位有符号整数属性
 	else if (Flags & EClassCastFlags::Int16Property)
 	{
 		return "int16";
 	}
+	// 32位有符号整数属性
 	else if (Flags & EClassCastFlags::IntProperty)
 	{
 		return "int32";
 	}
+	// 64位有符号整数属性
 	else if (Flags & EClassCastFlags::Int64Property)
 	{
 		return "int64";
 	}
+	// 浮点数属性
 	else if (Flags & EClassCastFlags::FloatProperty)
 	{
 		return "float";
 	}
+	// 双精度浮点数属性
 	else if (Flags & EClassCastFlags::DoubleProperty)
 	{
 		return "double";
 	}
+	// 类属性
 	else if (Flags & EClassCastFlags::ClassProperty)
 	{
 		if (Member.HasPropertyFlags(EPropertyFlags::UObjectWrapper))
@@ -148,34 +174,41 @@ std::string DumpspaceGenerator::GetMemberTypeStr(UEProperty Property, std::strin
 
 		return "UClass";
 	}
+	// 名称属性
 	else if (Flags & EClassCastFlags::NameProperty)
 	{
 		return "FName";
 	}
+	// 字符串属性
 	else if (Flags & EClassCastFlags::StrProperty)
 	{
 		return "FString";
 	}
+	// 文本属性
 	else if (Flags & EClassCastFlags::TextProperty)
 	{
 		return "FText";
 	}
+	// 布尔属性
 	else if (Flags & EClassCastFlags::BoolProperty)
 	{
 		return Member.Cast<UEBoolProperty>().IsNativeBool() ? "bool" : "uint8";
 	}
+	// 结构体属性
 	else if (Flags & EClassCastFlags::StructProperty)
 	{
 		const StructWrapper& UnderlayingStruct = Member.Cast<UEStructProperty>().GetUnderlayingStruct();
 
 		return GetStructPrefixedName(UnderlayingStruct);
 	}
+	// 数组属性
 	else if (Flags & EClassCastFlags::ArrayProperty)
 	{
 		OutSubtypes.push_back(GetMemberType(Member.Cast<UEArrayProperty>().GetInnerProperty()));
 
 		return "TArray";
 	}
+	// 弱对象属性
 	else if (Flags & EClassCastFlags::WeakObjectProperty)
 	{
 		if (UEClass PropertyClass = Member.Cast<UEWeakObjectProperty>().GetPropertyClass()) 
@@ -189,6 +222,7 @@ std::string DumpspaceGenerator::GetMemberTypeStr(UEProperty Property, std::strin
 
 		return "TWeakObjectPtr";
 	}
+	// 懒加载对象属性
 	else if (Flags & EClassCastFlags::LazyObjectProperty)
 	{
 		if (UEClass PropertyClass = Member.Cast<UELazyObjectProperty>().GetPropertyClass())
@@ -202,6 +236,7 @@ std::string DumpspaceGenerator::GetMemberTypeStr(UEProperty Property, std::strin
 
 		return "TLazyObjectPtr";
 	}
+	// 软类属性
 	else if (Flags & EClassCastFlags::SoftClassProperty)
 	{
 		if (UEClass PropertyClass = Member.Cast<UESoftClassProperty>().GetPropertyClass())
@@ -215,6 +250,7 @@ std::string DumpspaceGenerator::GetMemberTypeStr(UEProperty Property, std::strin
 
 		return "TSoftClassPtr";
 	}
+	// 软对象属性
 	else if (Flags & EClassCastFlags::SoftObjectProperty)
 	{
 		if (UEClass PropertyClass = Member.Cast<UESoftObjectProperty>().GetPropertyClass())
@@ -228,6 +264,7 @@ std::string DumpspaceGenerator::GetMemberTypeStr(UEProperty Property, std::strin
 
 		return "TSoftObjectPtr";
 	}
+	// 对象属性
 	else if (Flags & EClassCastFlags::ObjectProperty)
 	{
 		OutExtendedType = "*";
@@ -237,6 +274,7 @@ std::string DumpspaceGenerator::GetMemberTypeStr(UEProperty Property, std::strin
 		
 		return "UObject";
 	}
+	// 映射属性
 	else if (Flags & EClassCastFlags::MapProperty)
 	{
 		UEMapProperty MemberAsMapProperty = Member.Cast<UEMapProperty>();
@@ -246,259 +284,218 @@ std::string DumpspaceGenerator::GetMemberTypeStr(UEProperty Property, std::strin
 
 		return "TMap";
 	}
+	// 集合属性
 	else if (Flags & EClassCastFlags::SetProperty)
 	{
 		OutSubtypes.emplace_back(GetMemberType(Member.Cast<UESetProperty>().GetElementProperty()));
 
 		return "TSet";
 	}
+	// 接口属性
+	else if (Flags & EClassCastFlags::InterfaceProperty)
+	{
+		if (UEClass PropertyClass = Member.Cast<UEInterfaceProperty>().GetInterfaceClass())
+			return GetStructPrefixedName(PropertyClass);
+
+		return "TScriptInterface";
+	}
+	// 字段路径属性
+	else if (Flags & EClassCastFlags::FieldPathProperty)
+	{
+		if (FNameConst PropertyClass = Member.Cast<UEFieldPathProperty>().GetPropertyFName())
+		{
+			OutSubtypes.push_back(ManualCreateMemberType(DSGen::ET_Class, PropertyClass.ToString()));
+		}
+		else
+		{
+			OutSubtypes.push_back(ManualCreateMemberType(DSGen::ET_Class, "FField"));
+		}
+
+		return "TFieldPath";
+	}
+	// 枚举属性
 	else if (Flags & EClassCastFlags::EnumProperty)
 	{
 		if (UEEnum Enum = Member.Cast<UEEnumProperty>().GetEnum())
 			return GetEnumPrefixedName(Enum);
 
-		return "NamelessEnumIGuessIdkWhatToPutHereWithRegardsTheGuyFromDumper7";
+		return "enum";
 	}
-	else if (Flags & EClassCastFlags::InterfaceProperty)
-	{
-		if (UEClass PropertyClass = Member.Cast<UEInterfaceProperty>().GetPropertyClass())
-		{
-			OutSubtypes.push_back(GetMemberType(PropertyClass));
-		}
-		else
-		{
-			OutSubtypes.push_back(ManualCreateMemberType(DSGen::ET_Class, "IInterface"));
-		}
-
-		return "TScriptInterface";
-	}
-	else if (Flags & EClassCastFlags::FieldPathProperty)
-	{
-		if (UEFFieldClass PropertyClass = Member.Cast<UEFieldPathProperty>().GetFielClass())
-		{
-			OutSubtypes.push_back(ManualCreateMemberType(DSGen::ET_Struct, PropertyClass.GetCppName()));
-		}
-		else
-		{
-			OutSubtypes.push_back(ManualCreateMemberType(DSGen::ET_Struct, "FField"));
-		}
-
-		return "TFieldPath";
-	}
-	else if (Flags & EClassCastFlags::OptionalProperty)
-	{
-		UEProperty ValueProperty = Member.Cast<UEOptionalProperty>().GetValueProperty();
-
-		OutSubtypes.push_back(GetMemberType(ValueProperty));
-
-		return "TOptional";
-	}
-	else
-	{
-		/* When changing this also change 'GetUnknownProperties()' */
-		return (Class ? Class.GetCppName() : FieldClass.GetCppName()) + "_";
-	}
+	// 默认返回 "void"
+	return "void";
 }
 
-DSGen::MemberType DumpspaceGenerator::GetMemberType(const StructWrapper& Struct)
-{
-	DSGen::MemberType Type;
-	Type.type = Struct.IsClass() ? DSGen::ET_Class : DSGen::ET_Struct;
-	Type.typeName = GetStructPrefixedName(Struct);
-	Type.extendedType = Struct.IsClass() ? "*" : "";
-	Type.reference = false;
-
-	return Type;
-}
-
+// 获取成员类型
 DSGen::MemberType DumpspaceGenerator::GetMemberType(const PropertyWrapper& Property, bool bIsReference)
 {
-	DSGen::MemberType Type;
-
+	std::string Dummy;
+	std::vector<DSGen::MemberType> Dummys;
+	// 预定义成员
 	if (!Property.IsUnrealProperty())
-	{
-		Type.typeName = "Unsupported_Predefined_Member";
-		return Type;
-	}
-
-	Type.reference = bIsReference;
-	Type.type = GetMemberEType(Property);
-	Type.typeName = GetMemberTypeStr(Property.GetUnrealProperty(), Type.extendedType, Type.subTypes);
-
-	return Type;
+		return { DSGen::ET_Default, Property.GetType(), "", Property.IsBitField(), {} };
+	// 虚幻属性
+	return GetMemberType(Property.GetUnrealProperty(), bIsReference);
 }
 
+// 获取成员类型
 DSGen::MemberType DumpspaceGenerator::GetMemberType(UEProperty Property, bool bIsReference)
 {
-	DSGen::MemberType Type;
+	std::string ExtendedType = "";
+	std::vector<DSGen::MemberType> Subtypes;
 
-	Type.reference = bIsReference;
-	Type.type = GetMemberEType(Property);
-	Type.typeName = GetMemberTypeStr(Property, Type.extendedType, Type.subTypes);
+	std::string TypeName = GetMemberTypeStr(Property, ExtendedType, Subtypes);
 
-	return Type;
+	DSGen::EType EType = GetMemberEType(Property);
+
+	return { EType, TypeName, ExtendedType, Property.IsBitField(), Subtypes };
 }
 
+// 手动创建成员类型
 DSGen::MemberType DumpspaceGenerator::ManualCreateMemberType(DSGen::EType Type, const std::string& TypeName, const std::string& ExtendedType)
 {
-	return DSGen::createMemberType(Type, TypeName, ExtendedType);
+	return { Type, TypeName, ExtendedType, false, {} };
 }
 
-void DumpspaceGenerator::AddMemberToStruct(DSGen::ClassHolder& Struct, const PropertyWrapper& Property)
+// 生成枚举
+void DumpspaceGenerator::GenerateEnum(const EnumWrapper& Enum)
 {
-	DSGen::MemberDefinition Member;
-	Member.memberType = GetMemberType(Property);
-	Member.bitOffset = Property.IsBitField() ? Property.GetBitIndex() : -1;
-	Member.offset = Property.GetOffset();
-	Member.size = Property.GetSize() * Property.GetArrayDim();
-	Member.memberName = Property.GetName();
-	Member.arrayDim = Property.GetArrayDim();
+	DSGen::Enum EnumDef;
+	EnumDef.Name = GetEnumPrefixedName(Enum);
+	EnumDef.Size = Enum.GetSize();
+	EnumDef.Type = EnumSizeToType(EnumDef.Size);
 
-	Struct.members.push_back(std::move(Member));
-}
-
-void DumpspaceGenerator::RecursiveGetSuperClasses(const StructWrapper& Struct, std::vector<std::string>& OutSupers)
-{
-	const StructWrapper& Super = Struct.GetSuper();
-
-	OutSupers.push_back(Struct.GetUniqueName().first);
-
-	if (Super.IsValid())
-		RecursiveGetSuperClasses(Super, OutSupers);
-}
-
-std::vector<std::string> DumpspaceGenerator::GetSuperClasses(const StructWrapper& Struct)
-{
-	std::vector<std::string> RetSuperNames;
-
-	const StructWrapper& Super = Struct.GetSuper();
-
-	if (Super.IsValid())
-		RecursiveGetSuperClasses(Super, RetSuperNames);
-
-	return RetSuperNames;
-}
-
-DSGen::ClassHolder DumpspaceGenerator::GenerateStruct(const StructWrapper& Struct)
-{
-	DSGen::ClassHolder StructOrClass;
-	StructOrClass.className = GetStructPrefixedName(Struct);
-	StructOrClass.classSize = Struct.GetSize();
-	StructOrClass.classType = Struct.IsClass() ? DSGen::ET_Class : DSGen::ET_Struct;
-	StructOrClass.interitedTypes = GetSuperClasses(Struct);
-
-	MemberManager Members = Struct.GetMembers();
-
-	for (const PropertyWrapper& Wrapper : Members.IterateMembers())
-		AddMemberToStruct(StructOrClass, Wrapper);
-
-	if (!Struct.IsClass())
-		return StructOrClass;
-
-	for (const FunctionWrapper& Wrapper : Members.IterateFunctions())
-		StructOrClass.functions.push_back(GenearateFunction(Wrapper));
-
-	return StructOrClass;
-}
-
-DSGen::EnumHolder DumpspaceGenerator::GenerateEnum(const EnumWrapper& Enum)
-{
-	DSGen::EnumHolder Enumerator;
-	Enumerator.enumName = GetEnumPrefixedName(Enum);
-	Enumerator.enumType = EnumSizeToType(Enum.GetUnderlyingTypeSize());
-
-	Enumerator.enumMembers.reserve(Enum.GetNumMembers());
-		
-	for (const EnumCollisionInfo& Info : Enum.GetMembers())
-		Enumerator.enumMembers.emplace_back(Info.GetUniqueName(), Info.GetValue());
-
-	return Enumerator;
-}
-
-DSGen::FunctionHolder DumpspaceGenerator::GenearateFunction(const FunctionWrapper& Function)
-{
-	DSGen::FunctionHolder RetFunc;
-
-	StructWrapper FuncAsStruct = Function.AsStruct();
-	MemberManager FuncParams = FuncAsStruct.GetMembers();
-
-	RetFunc.functionName = Function.GetName();
-	RetFunc.functionOffset = Function.GetExecFuncOffset();
-	RetFunc.functionFlags = Function.StringifyFlags("|");
-	RetFunc.returnType = ManualCreateMemberType(DSGen::ET_Default, "void");
-
-	for (const PropertyWrapper& Param : FuncParams.IterateMembers())
+	for (auto& Name : Enum.GetMembers())
 	{
-		if (!Param.HasPropertyFlags(EPropertyFlags::Parm))
-			continue;
-
-		if (Param.HasPropertyFlags(EPropertyFlags::ReturnParm))
-		{
-			RetFunc.returnType = GetMemberType(Param);
-			continue;
-		}
-
-		RetFunc.functionParams.emplace_back(GetMemberType(Param), Param.GetName());
+		EnumDef.Members.push_back({ Name.first, Name.second });
 	}
 
-	return RetFunc;
+	Generator::Get().AddEnum(EnumDef);
 }
 
-void DumpspaceGenerator::GeneratedStaticOffsets()
+// 生成结构体
+void DumpspaceGenerator::GenerateStruct(const StructWrapper& Struct)
 {
-	DSGen::addOffset("OFFSET_GOBJECTS", Off::InSDK::ObjArray::GObjects);
-	DSGen::addOffset(Off::InSDK::Name::bIsUsingAppendStringOverToString ? "OFFSET_APPENDSTRING" : "OFFSET_TOSTRING", Off::InSDK::Name::AppendNameToString);
-	DSGen::addOffset("OFFSET_GNAMES", Off::InSDK::NameArray::GNames);
-	DSGen::addOffset("OFFSET_GWORLD", Off::InSDK::World::GWorld);
-	DSGen::addOffset("OFFSET_PROCESSEVENT", Off::InSDK::ProcessEvent::PEOffset);
-	DSGen::addOffset("INDEX_PROCESSEVENT", Off::InSDK::ProcessEvent::PEIndex);
+	DSGen::Struct StructDef;
+	StructDef.Name = GetStructPrefixedName(Struct);
+	StructDef.Size = Struct.GetSize();
+	StructDef.Super = Struct.GetSuper() ? GetStructPrefixedName(Struct.GetSuper()) : "";
+
+	for (const MemberProperty& Member : Struct.GetMembers())
+	{
+		DSGen::Member MemberDef;
+
+		MemberDef.Name = Member.GetName();
+		MemberDef.Type = GetMemberType(Member.GetProperty());
+		MemberDef.Offset = Member.GetOffset();
+		MemberDef.Size = Member.GetSize();
+
+		StructDef.Members.push_back(MemberDef);
+	}
+
+	Generator::Get().AddStruct(StructDef);
 }
 
+// 生成函数
+void DumpspaceGenerator::GenerateFunction(const StructWrapper& Function)
+{
+	DSGen::Struct FunctionDef;
+	FunctionDef.Name = GetStructPrefixedName(Function);
+	FunctionDef.Size = Function.GetSize();
+	FunctionDef.IsFunction = true;
+	FunctionDef.Super = Function.GetSuper() ? GetStructPrefixedName(Function.GetSuper()) : "";
+
+	for (const MemberProperty& Member : Function.GetMembers())
+	{
+		DSGen::Member MemberDef;
+		MemberDef.Name = Member.GetName();
+		MemberDef.Type = GetMemberType(Member.GetProperty(), Member.IsReturnParam()); // in Dumpspace references are handled as ret-val pointers
+		MemberDef.Offset = Member.GetOffset();
+		MemberDef.Size = Member.GetSize();
+
+		if (Member.IsReturnParam())
+			FunctionDef.Return = MemberDef;
+		else
+			FunctionDef.Members.push_back(MemberDef);
+	}
+
+	Generator::Get().AddStruct(FunctionDef);
+}
+
+// 生成类
+void DumpspaceGenerator::GenerateClass(const StructWrapper& Class)
+{
+	GenerateStruct(Class);
+}
+
+// 完成包的生成
+void DumpspaceGenerator::FinalizePackage(const PackageWrapper& Package)
+{
+	DSGen::Package PackageDef;
+
+	PackageDef.Name = Package.GetPath();
+	PackageDef.NumStructs = Package.GetNumStructs();
+	PackageDef.NumEnums = Package.GetNumEnums();
+
+	Generator::Get().AddPackage(PackageDef);
+}
+
+// 最终确定生成器
+void DumpspaceGenerator::FinalizeGenerator()
+{
+	DSGen::GeneratorOptions Options;
+	Options.GameName = (Settings::Generator::GameVersion + '-' + Settings::Generator::GameName);
+	Options.GameVersion = Settings::Generator::GameVersion;
+	Options.GameNameAndVersion = Settings::Generator::GameName;
+	Options.ProcessEventIndex = Off::InSDK::ProcessEvent::PEIndex;
+
+	Generator::Get().AddOptions(Options);
+
+	std::cout << "Writing Dumpspace file..." << std::endl;
+
+	Generator::Get().WriteToFile(DumperFolder / (Options.GameName + ".ds"));
+}
+
+// 运行生成器
 void DumpspaceGenerator::Generate()
 {
-	/* Set the output directory of DSGen to "...GenerationPath/GameVersion-GameName/Dumespace" */
-	DSGen::setDirectory(MainFolder);
-
-	/* Add offsets for GObjects, GNames, GWorld, AppendString, PrcessEvent and ProcessEventIndex*/
-	GeneratedStaticOffsets();
-
-	// Generates all packages and writes them to files
-	for (PackageInfoHandle Package : PackageManager::IterateOverPackageInfos())
+	// 访问并生成所有枚举
+	EnumManager::VisitAllEnums(GenerateEnum);
+	// 准备要生成的所有结构体
+	std::vector<StructWrapper> StructsToGenerate;
+	StructManager::GetAllStructs(StructsToGenerate);
+	// 定义一个生成类或结构体的回调函数
+	DependencyManager::OnVisitCallbackType GenerateClassOrStructCallback = [&](int32 Index) -> void
 	{
-		if (Package.IsEmpty())
-			continue;
+		StructWrapper Struct = StructManager::GetStructByIndex(Index);
 
-		/*
-		* Generate classes/structs/enums/functions directly into the respective files
-		*
-		* Note: Some filestreams aren't opened but passed as parameters anyway because the function demands it, they are not used if they are closed
-		*/
-		for (int32 EnumIdx : Package.GetEnums())
+		if (Struct.IsClass())
 		{
-			DSGen::EnumHolder Enum = GenerateEnum(ObjectArray::GetByIndex<UEEnum>(EnumIdx));
-			DSGen::bakeEnum(Enum);
+			GenerateClass(Struct);
 		}
-
-		DependencyManager::OnVisitCallbackType GenerateClassOrStructCallback = [&](int32 Index) -> void
+		else
 		{
-			DSGen::ClassHolder StructOrClass = GenerateStruct(ObjectArray::GetByIndex<UEStruct>(Index));
-			DSGen::bakeStructOrClass(StructOrClass);
-		};
-
-		if (Package.HasStructs())
-		{
-			const DependencyManager& Structs = Package.GetSortedStructs();
-
-			Structs.VisitAllNodesWithCallback(GenerateClassOrStructCallback);
+			GenerateStruct(Struct);
 		}
+	};
+	// 遍历并生成所有包
+	PackageManager::VisitAllPackages([&](const PackageWrapper& Package) -> bool
+	{
+		// 最终确定包
+		FinalizePackage(Package);
+		// 获取包内的函数
+		const auto& Functions = Package.GetFunctions();
 
-		if (Package.HasClasses())
+		for (const auto& Func : Functions)
 		{
-			const DependencyManager& Classes = Package.GetSortedClasses();
-
-			Classes.VisitAllNodesWithCallback(GenerateClassOrStructCallback);
+			GenerateFunction(Func);
 		}
-	}
+		// 获取包的依赖管理器
+		DependencyManager& Dependencies = Package.GetDependencyManager();
+		// 根据依赖关系生成类和结构体
+		Dependencies.Generate(GenerateClassOrStructCallback);
 
-	DSGen::dump();
+		return true;
+	});
+	// 最终确定生成器
+	FinalizeGenerator();
 }

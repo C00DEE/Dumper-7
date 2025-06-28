@@ -1,4 +1,3 @@
-
 #include <format>
 
 #include "Unreal/UnrealTypes.h"
@@ -7,6 +6,7 @@
 #include "Encoding/UnicodeNames.h"
 
 
+/// 使名称有效化，用于C++标识符
 std::string MakeNameValid(std::wstring&& Name)
 {
 	static constexpr const wchar_t* Numbers[10] =
@@ -59,11 +59,13 @@ std::string MakeNameValid(std::wstring&& Name)
 }
 
 
+/// FName 构造函数
 FName::FName(const void* Ptr)
 	: Address(static_cast<const uint8*>(Ptr))
 {
 }
 
+/// 初始化 FName，自动检测 AppendString 函数
 void FName::Init(bool bForceGNames)
 {
 	constexpr std::array<const char*, 5> PossibleSigs = 
@@ -135,6 +137,7 @@ void FName::Init(bool bForceGNames)
 	};
 }
 
+/// 通过提供偏移量来初始化 FName
 void FName::Init(int32 OverrideOffset, EOffsetOverrideType OverrideType, bool bIsNamePool, const char* const ModuleName)
 {
 	if (OverrideType == EOffsetOverrideType::GNames)
@@ -180,6 +183,7 @@ void FName::Init(int32 OverrideOffset, EOffsetOverrideType OverrideType, bool bI
 	std::cerr << std::format("Manual-Override: FName::{} --> Offset 0x{:X}\n\n", (Off::InSDK::Name::bIsUsingAppendStringOverToString ? "AppendString" : "ToString"), Off::InSDK::Name::AppendNameToString);
 }
 
+/// FName::ToString 的备用初始化方案
 void FName::InitFallback()
 {
 	Off::InSDK::Name::bIsUsingAppendStringOverToString = false;
@@ -205,6 +209,7 @@ void FName::InitFallback()
 }
 
 
+/// 获取原始的宽字符串名称
 std::wstring FName::ToRawWString() const
 {
 	if (!Address)
@@ -213,6 +218,7 @@ std::wstring FName::ToRawWString() const
 	return ToStr(Address);
 }
 
+/// 获取处理过的宽字符串名称（去除了路径）
 std::wstring FName::ToWString() const
 {
 	std::wstring OutputString = ToRawWString();
@@ -225,6 +231,7 @@ std::wstring FName::ToWString() const
 	return OutputString.substr(pos + 1);
 }
 
+/// 获取原始的字符串名称
 std::string FName::ToRawString() const
 {
 	if (!Address)
@@ -233,6 +240,7 @@ std::string FName::ToRawString() const
 	return UtfN::WStringToString(ToRawWString());
 }
 
+/// 获取处理过的字符串名称（去除了路径）
 std::string FName::ToString() const
 {
 	if (!Address)
@@ -241,16 +249,19 @@ std::string FName::ToString() const
 	return UtfN::WStringToString(ToWString());
 }
 
+/// 获取有效的C++标识符字符串
 std::string FName::ToValidString() const
 {
 	return MakeNameValid(ToWString());
 }
 
+/// 获取比较索引
 int32 FName::GetCompIdx() const 
 {
 	return *reinterpret_cast<const int32*>(Address + Off::FName::CompIdx);
 }
 
+/// 获取编号
 uint32 FName::GetNumber() const
 {
 	if (Settings::Internal::bUseOutlineNumberName)
@@ -262,16 +273,19 @@ uint32 FName::GetNumber() const
 	return static_cast<uint32_t>(*reinterpret_cast<const int32*>(Address + Off::FName::Number));
 }
 
+/// 比较两个 FName 是否相等
 bool FName::operator==(FName Other) const
 {
 	return GetCompIdx() == Other.GetCompIdx();
 }
 
+/// 比较两个 FName 是否不相等
 bool FName::operator!=(FName Other) const
 {
 	return GetCompIdx() != Other.GetCompIdx();
 }
 
+/// 将比较索引转换为字符串
 std::string FName::CompIdxToString(int CmpIdx)
 {
 	if (!Settings::Internal::bUseCasePreservingName)
@@ -296,6 +310,7 @@ std::string FName::CompIdxToString(int CmpIdx)
 	}
 }
 
+///【调试用】获取 AppendString 函数指针
 void* FName::DEBUGGetAppendString()
 {
 	return (void*)(AppendString);

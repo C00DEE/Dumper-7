@@ -6,8 +6,8 @@
 #include <utility>
 #include <array>
 
-// Tables taken from the llvm-project repository on github
-// LLVMs license: https://llvm.org/LICENSE.txt
+// 表格取自 github 上的 llvm-project 仓库
+// LLVM 的许可证: https://llvm.org/LICENSE.txt
 
 using UnicodeCharRange = std::pair<char32_t, char32_t>;
 
@@ -15,7 +15,7 @@ template<uint32_t Size>
 class UnicodeRangeTable
 {
 public:
-    /* Accessor functions to guarantee XID_Continue checks also check XID_Start, as ranges already contained by XID_Start aren't dumplicated into XID_Continue. */
+    /* 保证 XID_Continue 检查也检查 XID_Start 的访问器函数，因为 XID_Start 中已包含的范围不会在 XID_Continue 中重复。 */
     friend constexpr bool IsUnicodeCharXIDStart(char32_t Character);
     friend constexpr bool IsUnicodeCharXIDContinue(char32_t Character);
     friend constexpr bool IsUnicodeCharXIDContinueWithoutXIDStart(char32_t Character);
@@ -30,7 +30,7 @@ public:
         std::copy_n(Ranges, Size, std::begin(CharRanges));
     }
 
-    /* Restrict access to this function to friend functions to guarantee checks for XID_Continue also check XID_Start */
+    /* 限制对此函数的访问，仅限友元函数，以保证对 XID_Continue 的检查也检查 XID_Start */
 private:
     constexpr bool Contains(char32_t Character) const
     {
@@ -268,10 +268,10 @@ constexpr UnicodeCharRange XIDStartRangesData[] = {
     { 0x31350, 0x323AF }
 };
 
-// Unicode 15.1 XID_Continue, excluding XID_Start
-// The Unicode Property XID_Continue is a super set of XID_Start.
-// To save Space, the table below only contains the codepoints
-// that are not also in XID_Start.
+// Unicode 15.1 XID_Continue, 不包括 XID_Start
+// Unicode 属性 XID_Continue 是 XID_Start 的超集。
+// 为了节省空间，下表只包含
+// 那些不在 XID_Start 中的码点。
 constexpr UnicodeCharRange XIDContinueRangesData[] = {
     { 0x0030, 0x0039 },   { 0x005F, 0x005F },   { 0x00B7, 0x00B7 },
     { 0x0300, 0x036F },   { 0x0387, 0x0387 },   { 0x0483, 0x0487 },
@@ -401,22 +401,22 @@ constexpr UnicodeCharRange XIDContinueRangesData[] = {
     { 0x1E950, 0x1E959 }, { 0x1FBF0, 0x1FBF9 }, { 0xE0100, 0xE01EF },
 };
 
-// Create objects with automatic size calculation
+// 创建具有自动大小计算的对象
 constexpr UnicodeRangeTable XIDStartRanges(XIDStartRangesData);
 constexpr UnicodeRangeTable XIDContinueRanges(XIDContinueRangesData);
 
-/* Checks a character for the XID_Start property. XID_Start -> valid start character for a C++ name. */
+/* 检查一个字符是否具有 XID_Start 属性。XID_Start -> C++ 名称的有效起始字符。 */
 constexpr inline bool IsUnicodeCharXIDStart(char32_t Character)
 {
     return XIDStartRanges.Contains(Character);
 }
 
-/* Checks a character for the XID_Continue property.  XID_Continue -> valid followup (2nd or later) character for a C++ name. */
+/* 检查一个字符是否具有 XID_Continue 属性。XID_Continue -> C++ 名称的有效后续字符（第二个或更晚的字符）。 */
 constexpr bool IsUnicodeCharXIDContinue(char32_t Character)
 {
     return XIDStartRanges.Contains(Character) || XIDContinueRanges.Contains(Character);
 }
-/* Checks if a character has XID_Continue, but not XID_Start. */
+/* 检查一个字符是否具有 XID_Continue 属性，但不具有 XID_Start 属性。 */
 constexpr bool IsUnicodeCharXIDContinueWithoutXIDStart(char32_t Character)
 {
     return XIDContinueRanges.Contains(Character);

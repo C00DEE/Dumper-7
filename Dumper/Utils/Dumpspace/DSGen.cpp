@@ -2,10 +2,12 @@
 
 #include <fstream>
 
+// 构造函数
 DSGen::DSGen()
 {
 }
 
+// 设置生成文件的目录
 void DSGen::setDirectory(const std::filesystem::path& directory)
 {
 	DSGen::directory = directory;
@@ -13,11 +15,13 @@ void DSGen::setDirectory(const std::filesystem::path& directory)
 	dumpTimeStamp = std::to_string(std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count());
 }
 
+// 添加偏移量
 void DSGen::addOffset(const std::string& name, uintptr_t offset)
 {
 	offsets.push_back(std::pair(name, offset));
 }
 
+// 创建一个结构体或类的持有者
 DSGen::ClassHolder DSGen::createStructOrClass(const std::string& name, bool isClass, int size,
                                               const std::vector<std::string>& inheritedClasses)
 {
@@ -25,13 +29,14 @@ DSGen::ClassHolder DSGen::createStructOrClass(const std::string& name, bool isCl
 	c.className = name;
 	c.classType = isClass ? ET_Class : ET_Struct;
 	c.classSize = size;
-	//inherited types are all a class/struct if the current generated type is a class/struct
+	// 如果当前生成的类型是类/结构体，则所有继承的类型也都是类/结构体
 	if (!inheritedClasses.empty())
 		c.interitedTypes.insert(c.interitedTypes.begin(), inheritedClasses.begin(), inheritedClasses.end());
 
 	return c;
 }
 
+// 创建成员类型
 DSGen::MemberType DSGen::createMemberType(EType type, const std::string& typeName, const std::string& extendedType,
 	const std::vector<MemberType>& subTypes, bool isReference)
 {
@@ -45,6 +50,7 @@ DSGen::MemberType DSGen::createMemberType(EType type, const std::string& typeNam
 	return t;
 }
 
+// 向结构体或类中添加成员
 void DSGen::addMemberToStructOrClass(ClassHolder& classHolder, const std::string& memberName, EType type,
 	const std::string& typeName, const std::string& extendedType, int offset, int size, int arrayDim, int bitOffset)
 {
@@ -64,6 +70,7 @@ void DSGen::addMemberToStructOrClass(ClassHolder& classHolder, const std::string
 	classHolder.members.push_back(m);
 }
 
+// 向结构体或类中添加成员
 void DSGen::addMemberToStructOrClass(ClassHolder& classHolder, const std::string& memberName, const MemberType& memberType,
 	int offset, int size, int arrayDim, int bitOffset)
 {
@@ -78,6 +85,7 @@ void DSGen::addMemberToStructOrClass(ClassHolder& classHolder, const std::string
 	classHolder.members.push_back(m);
 }
 
+// 创建枚举持有者
 DSGen::EnumHolder DSGen::createEnum(const std::string& enumName, const std::string& enumType,
 	const std::vector<std::pair<std::string, int>>& enumMembers)
 {
@@ -91,7 +99,7 @@ DSGen::EnumHolder DSGen::createEnum(const std::string& enumName, const std::stri
 }
 
 
-
+// 创建函数并将其与所属类关联
 void DSGen::createFunction(ClassHolder& owningClass, const std::string& functionName,
                                             const std::string& functionFlags, uintptr_t functionOffset, const MemberType& returnType,
                                             const std::vector<std::pair<MemberType, std::string>>& functionParams)
@@ -107,6 +115,7 @@ void DSGen::createFunction(ClassHolder& owningClass, const std::string& function
 	owningClass.functions.push_back(f);
 }
 
+// "烘焙"结构体或类，将其转换为JSON格式以便序列化
 void DSGen::bakeStructOrClass(ClassHolder& classHolder)
 {
 	nlohmann::json jClass;
@@ -168,6 +177,7 @@ void DSGen::bakeStructOrClass(ClassHolder& classHolder)
 
 }
 
+// "烘焙"枚举，将其转换为JSON格式以便序列化
 void DSGen::bakeEnum(EnumHolder& enumHolder)
 {
 	nlohmann::json members = nlohmann::json::array();
@@ -182,36 +192,38 @@ void DSGen::bakeEnum(EnumHolder& enumHolder)
 	enums.push_back(j);
 }
 
+// 将所有收集和烘焙过的信息转储到磁盘上的JSON文件中
 void DSGen::dump()
 {
 	if (directory.empty())
 		throw std::exception("Please initialize a directory first!");
 
-	constexpr auto version = 10202;
+	constexpr auto version = 10202; // 定义使用的版本号
 
+	// lambda函数，用于将JSON对象保存到磁盘
 	auto saveToDisk = [&](const nlohmann::json& json, const std::string& fileName, bool offsetFile = false)
 	{
 		nlohmann::json j;
-		j["updated_at"] = dumpTimeStamp;
-		j["data"] = json;
-		j["version"] = version;
+		j["updated_at"] = dumpTimeStamp; // 添加时间戳
+		j["data"] = json; // 添加主要数据
+		j["version"] = version; // 添加版本号
 
 		if(offsetFile){
 			nlohmann::json credit;
-			credit["dumper_used"] = "Dumper-7";
-			credit["dumper_link"] = "https://github.com/Encryqed/Dumper-7";
-			j["credit"] = credit;
+			credit["dumper_used"] = "Dumper-7"; // 使用的工具名称
+			credit["dumper_link"] = "https://github.com/Encryqed/Dumper-7"; // 工具的链接
+			j["credit"] = credit; // 添加致谢信息
 		}
 
 		std::ofstream file(directory / fileName);
-		file << j.dump(-1, ' ', false, nlohmann::detail::error_handler_t::replace);
+		file << j.dump(-1, ' ', false, nlohmann::detail::error_handler_t::replace); // 将JSON写入文件
 	};
 
-	saveToDisk(nlohmann::json(nlohmann::json(offsets)), "OffsetsInfo.json", true);
-	saveToDisk(nlohmann::json(classes), "ClassesInfo.json");
-	saveToDisk(nlohmann::json(functions), "FunctionsInfo.json");
-	saveToDisk(nlohmann::json(structs), "StructsInfo.json");
-	saveToDisk(nlohmann::json(enums), "EnumsInfo.json");
+	saveToDisk(nlohmann::json(nlohmann::json(offsets)), "OffsetsInfo.json", true); // 保存偏移信息
+	saveToDisk(nlohmann::json(classes), "ClassesInfo.json"); // 保存类信息
+	saveToDisk(nlohmann::json(functions), "FunctionsInfo.json"); // 保存函数信息
+	saveToDisk(nlohmann::json(structs), "StructsInfo.json"); // 保存结构体信息
+	saveToDisk(nlohmann::json(enums), "EnumsInfo.json"); // 保存枚举信息
 
 
 }

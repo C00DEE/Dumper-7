@@ -9,6 +9,13 @@
 #include "Unreal/NameArray.h"
 
 
+/**
+ * @brief 初始化 ProcessEvent 的偏移量和索引。
+ * @details ProcessEvent 是 Unreal Engine 中用于处理蓝图事件和 RPC 的核心函数。
+ *          此函数通过扫描 UObject 虚函数表（VTable）来定位 ProcessEvent。
+ *          它使用特定的字节模式来识别正确的函数。如果主要方法失败，
+ *          它会尝试使用一个备用方法，即查找包含 "Accessed None" 字符串的函数附近。
+ */
 void Off::InSDK::ProcessEvent::InitPE()
 {
 	void** Vft = *(void***)ObjectArray::GetByIndex(0).GetAddress();
@@ -56,6 +63,13 @@ void Off::InSDK::ProcessEvent::InitPE()
 	std::cerr << "\nCouldn't find ProcessEvent!\n\n" << std::endl;
 }
 
+/**
+ * @brief 通过索引和模块名初始化 ProcessEvent 的偏移量。
+ * @details 这是一个备用初始化函数，当 ProcessEvent 的索引已知时使用。
+ *          它直接从虚函数表中获取函数地址，并根据模块基地址计算偏移量。
+ * @param Index ProcessEvent 在虚函数表中的索引。
+ * @param ModuleName 包含 ProcessEvent 的模块名称。
+ */
 void Off::InSDK::ProcessEvent::InitPE(int32 Index, const char* const ModuleName)
 {
 	Off::InSDK::ProcessEvent::PEIndex = Index;
@@ -68,6 +82,12 @@ void Off::InSDK::ProcessEvent::InitPE(int32 Index, const char* const ModuleName)
 }
 
 /* UWorld */
+/**
+ * @brief 初始化 GWorld 的偏移量。
+ * @details GWorld 是一个指向当前 UWorld 实例的全局指针。
+ *          此函数通过在内存中搜索指向 UWorld 对象的指针来找到 GWorld 的地址，
+ *          并计算其偏移量。
+ */
 void Off::InSDK::World::InitGWorld()
 {
 	UEClass UWorld = ObjectArray::FindClassFast("World");
@@ -95,6 +115,12 @@ void Off::InSDK::World::InitGWorld()
 
 
 /* FText */
+/**
+ * @brief 初始化 FText 相关偏移量。
+ * @details FText 的内存布局比较复杂。此函数通过调用一个已知的从 FString 到 FText 的转换函数，
+ *          然后在返回的 FText 对象内部查找特定的数据模式，来动态确定 FText 内部成员
+ *          （如 TextData 指针和字符串数据）的偏移量。
+ */
 void Off::InSDK::Text::InitTextOffsets()
 {
 	if (!Off::InSDK::ProcessEvent::PEIndex)
@@ -190,6 +216,13 @@ void Off::InSDK::Text::InitTextOffsets()
 	std::cerr << std::format("Off::InSDK::Text::InTextDataStringOffset: 0x{:X}\n\n", Off::InSDK::Text::InTextDataStringOffset);
 }
 
+/**
+ * @brief 初始化所有核心偏移量。
+ * @details 这是偏移量查找的主函数。它按顺序调用 OffsetFinder 中的各个查找函数，
+ *          以确定 Unreal Engine 核心数据结构（如 UObject, UClass, UStruct, UFunction, FProperty 等）
+ *          的关键成员偏移量。对于未找到的偏移量，会设置一个默认值以保证程序继续运行。
+ *          函数执行过程中会打印找到的每个偏移量。
+ */
 void Off::Init()
 {
 	auto OverwriteIfInvalidOffset = [](int32& Offset, int32 DefaultValue)
@@ -331,12 +364,23 @@ void Off::Init()
 	Off::ClassProperty::MetaClass = Off::InSDK::Properties::PropertySize + 0x8; //0x8 inheritance from ObjectProperty
 }
 
+/**
+ * @brief 初始化各种属性的大小。
+ * @details 除了偏移量，某些属性类型的大小也需要动态确定。
+ *          此命名空间下的函数负责初始化这些大小，例如 TDelegate 和 FFieldPath。
+ */
 void PropertySizes::Init()
 {
 	InitTDelegateSize();
 	InitFFieldPathSize();
 }
 
+/**
+ * @brief 初始化 TDelegate 的大小。
+ * @details 通过查找一个已知的委托属性（如 AudioComponent::OnQueueSubtitles）
+ *          来确定 TDelegate（在UProperty系统中为FDelegateProperty）的大小。
+ *          如果找不到，则会遍历所有对象来寻找一个委托属性。
+ */
 void PropertySizes::InitTDelegateSize()
 {
 	/* If the AudioComponent class or the OnQueueSubtitles member weren't found, fallback to looping GObjects and looking for a Delegate. */
@@ -371,6 +415,12 @@ void PropertySizes::InitTDelegateSize()
 	PropertySizes::DelegateProperty = OnQueueSubtitlesProp.GetSize();
 }
 
+/**
+ * @brief 初始化 FFieldPath 的大小。
+ * @details 在 FProperty 系统中，通过查找一个已知的 FFieldPathProperty 属性
+ *          （如 SetFieldPathPropertyByName 函数的 Value 参数）来确定其大小。
+ *          如果找不到，则会遍历所有对象来寻找一个 FFieldPathProperty。
+ */
 void PropertySizes::InitFFieldPathSize()
 {
 	if (!Settings::Internal::bUseFProperty)

@@ -1,38 +1,37 @@
-
 # Dumper-7
 
-SDK Generator for all Unreal Engine games. Supported versions are all of UE4 and UE5.
+所有虚幻引擎游戏的 SDK 生成器。支持所有 UE4 和 UE5 版本。
 
-## How to use
+## 如何使用
 
-- Compile the dll in x64-Release
-- Inject the dll into your target game
-- The SDK is generated into the path specified by `Settings::SDKGenerationPath`, by default this is `C:\\Dumper-7`
-- **See [UsingTheSDK](UsingTheSDK.md) for a guide to get started, or to migrate from an old SDK.**
-## Support Me
+- 在 x64-Release模式下编译 dll
+- 将 dll 注入到目标游戏中
+- SDK 会生成到 `Settings::SDKGenerationPath` 指定的路径，默认为 `C:\\Dumper-7`
+- **请参阅 [UsingTheSDK](UsingTheSDK.md) 获取入门指南，或从旧版 SDK 迁移。**
+## 支持我
 
 KoFi: https://ko-fi.com/fischsalat \
 Patreon: https://patreon.com/user?u=119629245
 
-## Overriding Offsets
+## 覆写偏移量
 
-- ### Only override any offsets if the generator doesn't find them, or if they are incorrect
-- All overrides are made in **Generator::InitEngineCore()** inside of **Generator.cpp**
+- ### 仅在生成器未找到偏移量或偏移量不正确时才覆写
+- 所有覆写都在 **Generator.cpp** 的 **Generator::InitEngineCore()** 中进行
 
-- GObjects (see [GObjects-Layout](#overriding-gobjects-layout) too)
+- GObjects (也请参阅 [覆写GObjects布局](#覆写gobjects布局))
   ```cpp
   ObjectArray::Init(/*GObjectsOffset*/, /*ChunkSize*/, /*bIsChunked*/);
   ```
   ```cpp
-  /* Make sure only to use types which exist in the sdk (eg. uint8, uint64) */
+  /* 确保只使用 sdk 中存在的类型 (例如 uint8, uint64) */
   InitObjectArrayDecryption([](void* ObjPtr) -> uint8* { return reinterpret_cast<uint8*>(uint64(ObjPtr) ^ 0x8375); });
   ```
 - FName::AppendString
-  - Forcing GNames:
+  - 强制使用 GNames:
     ```cpp
-    FName::Init(/*bForceGNames*/); // Useful if the AppendString offset is wrong
+    FName::Init(/*bForceGNames*/); // 如果 AppendString 偏移量错误，此项很有用
     ```
-  - Overriding the offset:
+  - 覆写偏移量:
     ```cpp
     FName::Init(/*OverrideOffset, OverrideType=[AppendString, ToString, GNames], bIsNamePool*/);
     ```
@@ -40,14 +39,14 @@ Patreon: https://patreon.com/user?u=119629245
   ```cpp
   Off::InSDK::InitPE(/*PEIndex*/);
   ```
-## Overriding GObjects-Layout
-- Only add a new layout if GObjects isn't automatically found for your game.
-- Layout overrides are at roughly line 30 of `ObjectArray.cpp`
-- For UE4.11 to UE4.20 add the layout to `FFixedUObjectArrayLayouts`
-- For UE4.21 and higher add the layout to `FChunkedFixedUObjectArrayLayouts`
-- **Examples:**
+## 覆写 GObjects 布局
+- 仅当您的游戏无法自动找到 GObjects 时才添加新布局。
+- 布局覆写位于 `ObjectArray.cpp` 的大约第 30 行
+- 对于 UE4.11 到 UE4.20，将布局添加到 `FFixedUObjectArrayLayouts`
+- 对于 UE4.21 及更高版本，将布局添加到 `FChunkedFixedUObjectArrayLayouts`
+- **示例:**
   ```cpp
-  FFixedUObjectArrayLayout // Default UE4.11 - UE4.20
+  FFixedUObjectArrayLayout // 默认 UE4.11 - UE4.20
   {
       .ObjectsOffset = 0x0,
       .MaxObjectsOffset = 0x8,
@@ -55,7 +54,7 @@ Patreon: https://patreon.com/user?u=119629245
   }
   ```
   ```cpp
-  FChunkedFixedUObjectArrayLayout // Default UE4.21 and above
+  FChunkedFixedUObjectArrayLayout // 默认 UE4.21 及以上
   {
       .ObjectsOffset = 0x00,
       .MaxElementsOffset = 0x10,
@@ -65,26 +64,26 @@ Patreon: https://patreon.com/user?u=119629245
   }
   ```
 
-## Config File
-You can optionally dynamically change settings through a `Dumper-7.ini` file, instead of modifying `Settings.h`.
-- **Per-game**: Create `Dumper-7.ini` in the same directory as the game's exe file.
-- **Global**: Create `Dumper-7.ini` under `C:\Dumper-7`
+## 配置文件
+您可以选择通过 `Dumper-7.ini` 文件动态更改设置，而不是修改 `Settings.h`。
+- **针对单个游戏**: 在游戏 exe 文件所在的目录中创建 `Dumper-7.ini`。
+- **全局**: 在 `C:\Dumper-7` 下创建 `Dumper-7.ini`。
 
-Example:
+示例:
 ```ini
 [Settings]
 SleepTimeout=100
 SDKNamespaceName=MyOwnSDKNamespace
 ```
-## Issues
+## 问题
 
-If you have any issues using the Dumper, please create an Issue on this repository\
-and explain the problem **in detail**.
+如果您在使用 Dumper 时遇到任何问题，请在此仓库中创建一个 Issue\
+并**详细**说明问题。
 
-- Should your game be crashing while dumping, attach Visual Studios' debugger to the game and inject the Dumper-7.dll in debug-configuration.
-Then include screenshots of the exception causing the crash, a screenshot of the callstack, as well as the console output.
+- 如果您的游戏在转储时崩溃，请将 Visual Studio 的调试器附加到游戏进程，并在调试配置中注入 Dumper-7.dll。
+然后附上导致崩溃的异常截图、调用堆栈截图以及控制台输出。
 
-- Should there be any compiler-errors in the SDK please send screenshots of them. Please note that **only build errors** are considered errors, as Intellisense often reports false positives.
-Make sure to always send screenshots of the code causing the first error, as it's likely to cause a chain-reaction of errors.
+- 如果 SDK 中出现任何编译器错误，请发送截图。请注意，**只有构建错误**才被视为错误，因为 Intellisense 经常报告误报。
+请务必发送导致第一个错误的代码截图，因为它很可能引发连锁错误反应。
 
-- Should your own dll-project crash, verify your code thoroughly to make sure the error actually lies within the generated SDK.
+- 如果您自己的 dll 项目崩溃，请彻底检查您的代码，以确保错误确实出在生成的 SDK 中。

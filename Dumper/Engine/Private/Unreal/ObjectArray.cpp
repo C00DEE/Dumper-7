@@ -1,4 +1,3 @@
-
 #include <iostream>
 #include <fstream>
 #include <format>
@@ -11,6 +10,7 @@
 
 namespace fs = std::filesystem;
 
+// 定义不同版本UE4的固定UObject数组布局
 constexpr inline std::array FFixedUObjectArrayLayouts =
 {
 	FFixedUObjectArrayLayout // Default UE4.11 - UE4.20
@@ -21,6 +21,7 @@ constexpr inline std::array FFixedUObjectArrayLayouts =
 	}
 };
 
+// 定义不同版本UE4的分块固定UObject数组布局
 constexpr inline std::array FChunkedFixedUObjectArrayLayouts =
 {
 	FChunkedFixedUObjectArrayLayout // Default UE4.21 and above
@@ -57,9 +58,10 @@ constexpr inline std::array FChunkedFixedUObjectArrayLayouts =
 	}
 };
 
+// 验证地址是否是有效的GObjects（固定布局）
 bool IsAddressValidGObjects(const uintptr_t Address, const FFixedUObjectArrayLayout& Layout)
 {
-	/* It is assumed that the FUObjectItem layout is constant amongst all games using FFixedUObjectArray for ObjObjects. */
+	/* 假设在所有使用FFixedUObjectArray的游戏中FUObjectItem布局是常量的。 */
 	struct FUObjectItem
 	{
 		void* Object;
@@ -98,6 +100,7 @@ bool IsAddressValidGObjects(const uintptr_t Address, const FFixedUObjectArrayLay
 	return true;
 }
 
+// 验证地址是否是有效的GObjects（分块布局）
 bool IsAddressValidGObjects(const uintptr_t Address, const FChunkedFixedUObjectArrayLayout& Layout)
 {
 	void* Objects = *reinterpret_cast<void**>(Address + Layout.ObjectsOffset);
@@ -117,23 +120,23 @@ bool IsAddressValidGObjects(const uintptr_t Address, const FChunkedFixedUObjectA
 	if (NumElements > MaxElements || NumChunks > MaxChunks)
 		return false;
 
-	/* There are never too many or too few chunks for all elements. Two different chunk-sizes (0x10000, 0x10400) occure on different UE versions and are checked for.*/
+	/* 区块数量对于所有元素来说永远不会太多或太少。不同的UE版本上出现两种不同的区块大小（0x10000, 0x10400）并进行检查。 */
 	const bool bNumChunksFitsNumElements = ((NumElements / 0x10000) + 1) == NumChunks || ((NumElements / 0x10400) + 1) == NumChunks;
 
 	if (!bNumChunksFitsNumElements)
 		return false;
 
-	/* Same as above for the max number of elements/chunks. */
+	/* 与上述相同，但是针对最大元素数量/区块。 */
 	const bool bMaxChunksFitsMaxElements = (MaxElements / 0x10000) == MaxChunks || (MaxElements / 0x10400) == MaxChunks;
 
 	if (!bMaxChunksFitsMaxElements)
 		return false;
 
-	/* The chunk-pointer must always be valid (especially because it's already decrypted [if it was encrypted at all]) */
+	/* 区块指针必须始终有效（特别是因为它已经被解密[如果它曾被加密的话]） */
 	if (!ObjectsPtrButDecrypted || IsBadReadPtr(ObjectsPtrButDecrypted))
 		return false;
 
-	/* Check if every chunk-pointer is valid. */
+	/* 检查每个区块指针是否有效。 */
 	for (int i = 0; i < NumChunks; i++)
 	{
 		if (!ObjectsPtrButDecrypted[i] || IsBadReadPtr(ObjectsPtrButDecrypted[i]))
@@ -144,7 +147,7 @@ bool IsAddressValidGObjects(const uintptr_t Address, const FChunkedFixedUObjectA
 }
 
 
-
+// 初始化FUObjectItem，确定偏移量和大小
 void ObjectArray::InitializeFUObjectItem(uint8_t* FirstItemPtr)
 {
 	for (int i = 0x0; i < 0x10; i += 4)
@@ -172,12 +175,14 @@ void ObjectArray::InitializeFUObjectItem(uint8_t* FirstItemPtr)
 	Off::InSDK::ObjArray::FUObjectItemSize = SizeOfFUObjectItem;
 }
 
+// 初始化解密功能
 void ObjectArray::InitDecryption(uint8_t* (*DecryptionFunction)(void* ObjPtr), const char* DecryptionLambdaAsStr)
 {
 	DecryptPtr = DecryptionFunction;
 	DecryptionLambdaStr = DecryptionLambdaAsStr;
 }
 
+// 初始化区块大小
 void ObjectArray::InitializeChunkSize(uint8_t* ChunksPtr)
 {
 	int IndexOffset = 0x0;
@@ -208,7 +213,8 @@ void ObjectArray::InitializeChunkSize(uint8_t* ChunksPtr)
 	Off::InSDK::ObjArray::ChunkSize = NumElementsPerChunk;
 }
 
-/* We don't speak about this function... */
+/* 我们不讨论这个函数... */
+// 初始化对象数组，扫描内存找到GObjects
 void ObjectArray::Init(bool bScanAllMemory, const char* const ModuleName)
 {
 	if (!bScanAllMemory)
@@ -234,12 +240,13 @@ void ObjectArray::Init(bool bScanAllMemory, const char* const ModuleName)
 		}
 	}
 
-	/* Sub 0x50 so we don't try to read out of bounds memory when checking FixedArray->IsValid() or ChunkedArray->IsValid() */
+	/* 减去0x50，这样我们在检查FixedArray->IsValid()或ChunkedArray->IsValid()时就不会尝试读取越界内存 */
 	SearchRange -= 0x50;
 
 	if (!bScanAllMemory)
 		std::cerr << "Searching for GObjects...\n\n";
 
+	// Lambda函数，检查地址是否符合任何数组布局
 	auto MatchesAnyLayout = []<typename ArrayLayoutType, size_t Size>(const std::array<ArrayLayoutType, Size>& ObjectArrayLayouts, uintptr_t Address)
 	{
 		for (const ArrayLayoutType& Layout : ObjectArrayLayouts)
@@ -264,6 +271,7 @@ void ObjectArray::Init(bool bScanAllMemory, const char* const ModuleName)
 		return false;
 	};
 
+	// 扫描内存寻找GObjects
 	for (int i = 0; i < SearchRange; i += 0x4)
 	{
 		const uintptr_t CurrentAddress = SearchBase + i;
@@ -344,6 +352,7 @@ void ObjectArray::Init(bool bScanAllMemory, const char* const ModuleName)
 	}
 }
 
+// 使用指定偏移量初始化固定对象数组
 void ObjectArray::Init(int32 GObjectsOffset, const FFixedUObjectArrayLayout& ObjectArrayLayout, const char* const ModuleName)
 {
 	GObjects = reinterpret_cast<uint8_t*>(GetModuleBase(ModuleName) + GObjectsOffset);
@@ -369,6 +378,7 @@ void ObjectArray::Init(int32 GObjectsOffset, const FFixedUObjectArrayLayout& Obj
 	ObjectArray::InitializeFUObjectItem(*reinterpret_cast<uint8_t**>(ChunksPtr));
 }
 
+// 使用指定偏移量和区块大小初始化分块对象数组
 void ObjectArray::Init(int32 GObjectsOffset, int32 ElementsPerChunk, const FChunkedFixedUObjectArrayLayout& ObjectArrayLayout, const char* const ModuleName)
 {
 	GObjects = reinterpret_cast<uint8_t*>(GetModuleBase(ModuleName) + GObjectsOffset);
@@ -399,6 +409,7 @@ void ObjectArray::Init(int32 GObjectsOffset, int32 ElementsPerChunk, const FChun
 	ObjectArray::InitializeFUObjectItem(*reinterpret_cast<uint8_t**>(ChunksPtr));
 }
 
+// 输出GObjects到文件
 void ObjectArray::DumpObjects(const fs::path& Path, bool bWithPathname)
 {
 	std::ofstream DumpStream(Path / "GObjects-Dump.txt");
@@ -422,6 +433,7 @@ void ObjectArray::DumpObjects(const fs::path& Path, bool bWithPathname)
 	DumpStream.close();
 }
 
+// 输出带属性的GObjects到文件
 void ObjectArray::DumpObjectsWithProperties(const fs::path& Path, bool bWithPathname)
 {
 	std::ofstream DumpStream(Path / "GObjects-Dump-WithProperties.txt");
@@ -453,18 +465,20 @@ void ObjectArray::DumpObjectsWithProperties(const fs::path& Path, bool bWithPath
 	DumpStream.close();
 }
 
-
+// 获取对象数组中的元素数量
 int32 ObjectArray::Num()
 {
 	return *reinterpret_cast<int32*>(GObjects + Off::FUObjectArray::GetNumElementsOffset());
 }
 
+// 通过索引获取特定类型的对象
 template<typename UEType>
 static UEType ObjectArray::GetByIndex(int32 Index)
 {
 	return UEType(ByIndex(GObjects + Off::FUObjectArray::GetObjectsOffset(), Index, SizeOfFUObjectItem, FUObjectItemInitialOffset, NumElementsPerChunk));
 }
 
+// 通过全名查找特定类型的对象
 template<typename UEType>
 UEType ObjectArray::FindObject(const std::string& FullName, EClassCastFlags RequiredType)
 {
@@ -479,6 +493,7 @@ UEType ObjectArray::FindObject(const std::string& FullName, EClassCastFlags Requ
 	return UEType();
 }
 
+// 通过名称快速查找特定类型的对象
 template<typename UEType>
 UEType ObjectArray::FindObjectFast(const std::string& Name, EClassCastFlags RequiredType)
 {
@@ -495,6 +510,7 @@ UEType ObjectArray::FindObjectFast(const std::string& Name, EClassCastFlags Requ
 	return UEType();
 }
 
+// 在特定外部对象中通过名称快速查找对象
 template<typename UEType>
 static UEType ObjectArray::FindObjectFastInOuter(const std::string& Name, std::string Outer)
 {
@@ -511,46 +527,55 @@ static UEType ObjectArray::FindObjectFastInOuter(const std::string& Name, std::s
 	return UEType();
 }
 
+// 通过名称查找结构体
 UEStruct ObjectArray::FindStruct(const std::string& Name)
 {
 	return FindObjectFast<UEClass>(Name, EClassCastFlags::Struct);
 }
 
+// 通过名称快速查找结构体
 UEStruct ObjectArray::FindStructFast(const std::string& Name)
 {
 	return FindObjectFast<UEClass>(Name, EClassCastFlags::Struct);
 }
 
+// 通过全名查找类
 UEClass ObjectArray::FindClass(const std::string& FullName)
 {
 	return FindObject<UEClass>(FullName, EClassCastFlags::Class);
 }
 
+// 通过名称快速查找类
 UEClass ObjectArray::FindClassFast(const std::string& Name)
 {
 	return FindObjectFast<UEClass>(Name, EClassCastFlags::Class);
 }
 
+// 获取对象数组的开始迭代器
 ObjectArray::ObjectsIterator ObjectArray::begin()
 {
 	return ObjectsIterator();
 }
+
+// 获取对象数组的结束迭代器
 ObjectArray::ObjectsIterator ObjectArray::end()
 {
 	return ObjectsIterator(Num());
 }
 
-
+// 对象数组迭代器构造函数
 ObjectArray::ObjectsIterator::ObjectsIterator(int32 StartIndex)
 	: CurrentIndex(StartIndex), CurrentObject(ObjectArray::GetByIndex(StartIndex))
 {
 }
 
+// 对象数组迭代器解引用操作符
 UEObject ObjectArray::ObjectsIterator::operator*()
 {
 	return CurrentObject;
 }
 
+// 对象数组迭代器前缀递增操作符
 ObjectArray::ObjectsIterator& ObjectArray::ObjectsIterator::operator++()
 {
 	CurrentObject = ObjectArray::GetByIndex(++CurrentIndex);
@@ -566,21 +591,22 @@ ObjectArray::ObjectsIterator& ObjectArray::ObjectsIterator::operator++()
 	return *this;
 }
 
+// 对象数组迭代器不等于操作符
 bool ObjectArray::ObjectsIterator::operator!=(const ObjectsIterator& Other)
 {
 	return CurrentIndex != Other.CurrentIndex;
 }
 
+// 获取当前迭代器索引
 int32 ObjectArray::ObjectsIterator::GetIndex() const
 {
 	return CurrentIndex;
 }
 
 /*
-* The compiler won't generate functions for a specific template type unless it's used in the .cpp file corresponding to the
-* header it was declatred in.
+* 编译器不会为特定的模板类型生成函数，除非它在对应头文件声明的.cpp文件中使用。
 *
-* See https://stackoverflow.com/questions/456713/why-do-i-get-unresolved-external-symbol-errors-when-using-templates
+* 参见 https://stackoverflow.com/questions/456713/why-do-i-get-unresolved-external-symbol-errors-when-using-templates
 */
 [[maybe_unused]] void TemplateTypeCreationForObjectArray(void)
 {

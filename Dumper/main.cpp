@@ -1,4 +1,3 @@
-
 #include <Windows.h>
 #include <iostream>
 #include <chrono>
@@ -22,8 +21,10 @@ enum class EFortToastType : uint8
 
 DWORD MainThread(HMODULE Module)
 {
+	// 分配控制台
 	AllocConsole();
 	FILE* Dummy;
+	// 重定向标准输出/输入
 	freopen_s(&Dummy, "CONOUT$", "w", stderr);
 	freopen_s(&Dummy, "CONIN$", "r", stdin);
 
@@ -31,6 +32,7 @@ DWORD MainThread(HMODULE Module)
 
 	std::cerr << "Started Generation [Dumper-7]!\n";
 
+	// 加载配置
 	Settings::Config::Load();
 
 	if (Settings::Config::SleepTimeout > 0)
@@ -39,12 +41,14 @@ DWORD MainThread(HMODULE Module)
 		Sleep(Settings::Config::SleepTimeout);
 	}
 
+	// 初始化引擎核心
 	Generator::InitEngineCore();
+	// 初始化内部组件
 	Generator::InitInternal();
 
 	if (Settings::Generator::GameName.empty() && Settings::Generator::GameVersion.empty())
 	{
-		// Only Possible in Main()
+		// 仅在Main()中可能
 		FString Name;
 		FString Version;
 		UEClass Kismet = ObjectArray::FindClassFast("KismetSystemLibrary");
@@ -76,6 +80,7 @@ DWORD MainThread(HMODULE Module)
 
 	while (true)
 	{
+		// 按 F6 退出
 		if (GetAsyncKeyState(VK_F6) & 1)
 		{
 			fclose(stdout);
@@ -96,6 +101,7 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD reason, LPVOID lpReserved)
 	switch (reason)
 	{
 	case DLL_PROCESS_ATTACH:
+		// 创建主线程
 		CreateThread(0, 0, (LPTHREAD_START_ROUTINE)MainThread, hModule, 0, 0);
 		break;
 	}

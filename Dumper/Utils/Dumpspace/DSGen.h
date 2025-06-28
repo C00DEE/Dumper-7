@@ -8,28 +8,27 @@ class DSGen
 {
 public:
 
-	// The EType enum describes the type of the member of a class, struct, enum or param of a function
-	// or the class, struct, function, enum itself.
-	// Setting the correct type is important for the dumspace website in order to know where to redirect
-	// when clicking on the type.
-	// Pointers or references dont play a role here, for example is the member UWorld* owningWorld a ET_Class.
-	// More examples:
+	// EType 枚举描述了类、结构体、枚举或函数参数的成员类型
+	// 或类、结构体、函数、枚举本身。
+	// 设置正确的类型对于 dumpspace 网站来说很重要，以便在点击类型时知道重定向到哪里。
+	// 指针或引用在这里不起作用，例如，成员 UWorld* owningWorld 是一个 ET_Class。
+	// 更多示例：
 	// int itemCount -> ET_Default
-	// EToastType type -> ET_Enum (if we can confirm EToastType is a enum)
-	// FVector location -> ET_Struct (if we can confirm FVector is a struct)
-	// AWeaponDef* weaponDefinition -> ET_Class (if we can confirm AWeaponDef is a class)
-	// Template examples:
-	// TMap<int, FVector> -> ET_Class, we ignore what the templates (int, FVector) are
+	// EToastType type -> ET_Enum (如果我们能确认 EToastType 是一个枚举)
+	// FVector location -> ET_Struct (如果我们能确认 FVector 是一个结构体)
+	// AWeaponDef* weaponDefinition -> ET_Class (如果我们能确认 AWeaponDef 是一个类)
+	// 模板示例：
+	// TMap<int, FVector> -> ET_Class，我们忽略模板（int, FVector）是什么
 	//
-	// Keep in mind, if you have a member and its type is UNKNOWN, so not defined, mark the member as ET_Default.
-	// Otherwise, the website will search for the type, resulting in a missing definition error.
+	// 请记住，如果你有一个成员，并且它的类型是未知的，即未定义的，请将该成员标记为 ET_Default。
+	// 否则，网站将搜索该类型，导致缺少定义错误。
 	enum EType
 	{
-		ET_Default, // all types that are either undefined or default (int, bool, char,..., FType (undefined))
-		ET_Struct, // all types that are a struct (FVector, Fquat)
-		ET_Class, // all types that are a class (Uworld, UWorld*)
-		ET_Enum, // all types that are a enum (EToastType)
-		ET_Function //not needed, only needed for function definition
+		ET_Default, // 所有未定义或默认的类型（int, bool, char,..., FType（未定义））
+		ET_Struct,  // 所有结构体类型（FVector, Fquat）
+		ET_Class,   // 所有类类型（Uworld, UWorld*）
+		ET_Enum,    // 所有枚举类型（EToastType）
+		ET_Function // 不需要，仅用于函数定义
 
 
 	};
@@ -49,26 +48,26 @@ public:
 		return {};
 	}
 
-	// MemberType struct holds information about the members type
+	// MemberType 结构体保存有关成员类型的信息
 	struct MemberType
 	{
-		EType type; // the EType of the membertype
-		std::string typeName; // the name of the type, e.g UClass (this should not contain any * or & !!)
-		std::string extendedType; // if the type is a UClass* make sure the * is in here!! If not, this can be left empty
-		bool reference = false; // only needed in function parameters. Ingore otherwise
-		std::vector<MemberType> subTypes; // most of the times empty, just needed if the MemberType is a template, e.g TArray<abc>
+		EType type; // 成员类型的 EType
+		std::string typeName; // 类型的名称，例如 UClass（不应包含任何 * 或 & ！）
+		std::string extendedType; // 如果类型是 UClass*，请确保 * 在这里！如果不是，则可以留空
+		bool reference = false; // 仅在函数参数中需要。否则忽略
+		std::vector<MemberType> subTypes; // 大多数情况下为空，仅当 MemberType 是模板时才需要，例如 TArray<abc>
 
 		/**
-		 * \brief creates a JSON with all the information about the MemberType and SubTypes
-		 * \return returns a JSON with all the information about the MemberType and SubTypes
+		 * \brief 创建一个包含有关 MemberType 和 SubTypes 所有信息的 JSON
+		 * \return 返回一个包含有关 MemberType 和 SubTypes 所有信息的 JSON
 		 */
 		nlohmann::json jsonify() const
 		{
-			//create a array for the memberType
+			//为 memberType 创建一个数组
 			nlohmann::json arr = nlohmann::json::array();
-			arr.push_back(typeName); //first the typeName
-			arr.push_back(getTypeShort(type)); //then the short Type
-			arr.push_back(extendedType); //then any extended type
+			arr.push_back(typeName); //首先是 typeName
+			arr.push_back(getTypeShort(type)); //然后是短类型
+			arr.push_back(extendedType); //然后是任何扩展类型
 			nlohmann::json subTypeArr = nlohmann::json::array();
 			for (auto& subType : subTypes)
 				subTypeArr.push_back(subType.jsonify());
@@ -79,7 +78,7 @@ public:
 		}
 	};
 
-	// MemberDefinition contains all the information of the member needed
+	// MemberDefinition 包含成员所需的所有信息
 	struct MemberDefinition
 	{
 		MemberType memberType;
@@ -93,14 +92,14 @@ public:
 
 	struct FunctionHolder
 	{
-		std::string functionName; // the name of the function e.g getWeapon
-		std::string functionFlags; // flags how to call the function e.g Blueprint|Static|abc
-		uintptr_t functionOffset; // offset of the function within the binary
-		MemberType returnType; // the return type, if there's no, pass void
-		std::vector<std::pair<MemberType, std::string>> functionParams; // the function params with their type and name
+		std::string functionName; // 函数的名称，例如 getWeapon
+		std::string functionFlags; // 调用函数的标志，例如 Blueprint|Static|abc
+		uintptr_t functionOffset; // 函数在二进制文件中的偏移量
+		MemberType returnType; // 返回类型，如果没有，则传递 void
+		std::vector<std::pair<MemberType, std::string>> functionParams; // 函数参数及其类型和名称
 	};
 
-	// Classholder can be for classes and structs, they are theoretically the same. The struct holds all information about the clas
+	// Classholder 可以用于类和结构体，它们在理论上是相同的。该结构体保存有关类的所有信息
 	struct ClassHolder
 	{
 		int classSize;
@@ -113,9 +112,9 @@ public:
 
 	struct EnumHolder
 	{
-		std::string enumType; // enum type, uint32_t or int or uint64_t
-		std::string enumName; // name of the enum 
-		std::vector<std::pair<std::string, int>> enumMembers; //enum members, their name and representative number (abc = 5)
+		std::string enumType; // 枚举类型，uint32_t 或 int 或 uint64_t
+		std::string enumName; // 枚举的名称
+		std::vector<std::pair<std::string, int>> enumMembers; //枚举成员，它们的名称和代表数字（abc = 5）
 	};
 
 
@@ -133,46 +132,23 @@ private:
 	static inline nlohmann::json enums = nlohmann::json::array();
 
 public:
-	//redundant constructor
+	//多余的构造函数
 	DSGen();
 
-	/**
-	 * \brief sets the directory path. The dumpspace files will be under directory/dumpspace
-	 * \param directory valid directory
-	 */
+	// 设置目录路径。dumpspace 文件将位于 directory/dumpspace 下
 	static void setDirectory(const std::filesystem::path& directory);
 
-	/**
-	 * \brief 
-	 * \param name the name of the offset
-	 * \param offset the offset (base address subtracted!)
-	 */
+	// 添加偏移量
 	static void addOffset(const std::string& name, uintptr_t offset);
 
-	/**
-	 * \brief creates a class or struct you can use to add members. If size or inherits are unknown, you can add them later on.
-	 * \param name the name of the class or struct
-	 * \param isClass whether its a class or struct
-	 * \param size the sizeof the class
-	 * \param inheritedClasses the inherited classes or structs, ordered from last to first
-	 * (ClassC : ClassB, ClassB : ClassA, ClassA : Root -> {ClassB, ClassA, Root})
-	 * \return a ClassHolder struct for you to add members
-	 */
+	// 创建一个可以用来添加成员的类或结构体。如果大小或继承未知，可以稍后添加。
 	static ClassHolder createStructOrClass(
 		const std::string& name, 
 		bool isClass = true, 
 		int size = 0, 
 		const std::vector<std::string>& inheritedClasses = {});
 
-	/**
-	 * \brief creates a MemberType struct. Creating a MemberType is only really needed if the Member is a template type and has subTypes or if the Member is a subtype
-	 * \param type EType (e.g TArray<int> -> EType::ET_Class)
-	 * \param typeName the name (e.g TArray)
-	 * \param extendedType the extended type (e.g TArray<abc>& -> &, TArray<def>* -> *, or empty if there's no extended type)
-	 * \param subTypes any subtypes (e.g TArray<int> -> "int" is the subtype, or empty if there are no subtypes)
-	 * \param isReference leave this false, unless you create a memberType for a function which is a reference
-	 * \return the MemberType struct
-	 */
+	// 创建一个 MemberType 结构体。仅当成员是模板类型且具有子类型或成员是子类型时，才真正需要创建 MemberType
 	static MemberType createMemberType(
 		EType type, 
 		const std::string& typeName, 
@@ -181,18 +157,7 @@ public:
 		bool isReference = false
 	);
 
-	/**
-	 * \brief adds a new member to the class or struct
-	 * \param classHolder ClassHolder struct where the member gets added to
-	 * \param memberName the name of the member
-	 * \param type the EType of the member (e.g Ulevel* -> ET_Class)
-	 * \param typeName the type name of the member (e.g level)
-	 * \param extendedType the extended type, if any (e,g ULevel* -> *, int& -> &, or empty)
-	 * \param offset the offset of the member within the struct or class
-	 * \param size the size of the member
-	 * \param arrayDim the array dimension of the member, default 1 (int foo -> 1, int foo[123] -> 123)
-	 * \param bitOffset the bit Offset of the member, leave -1 if member has no bitOffset
-	 */
+	// 向类或结构体添加一个新成员
 	static void addMemberToStructOrClass(
 		ClassHolder& classHolder, 
 		const std::string& memberName, 
@@ -205,16 +170,7 @@ public:
 		int bitOffset = -1
 	);
 
-	/**
-	 * \brief adds a new member to the class or struct
-	 * \param classHolder ClassHolder struct where the member gets added to
-	 * \param memberName the name of the member
-	 * \param memberType memberType struct
-	 * \param offset the offset of the member within the struct or class
-	 * \param size the size of the member
-	 * \param arrayDim the array dimension of the member, default 1 (int foo -> 1, int foo[123] -> 123)
-	 * \param bitOffset the bit Offset of the member, leave -1 if member has no bitOffset
-	 */
+	// 向类或结构体添加一个新成员
 	static void addMemberToStructOrClass(
 		ClassHolder& classHolder,
 		const std::string& memberName,
@@ -225,13 +181,7 @@ public:
 		int bitOffset = -1
 	);
 
-	/**
-	 * \brief creates a EnumHolder
-	 * \param enumName the name of the enum
-	 * \param enumType the type of the enum (int, uint32_t, uint64_t,...)
-	 * \param enumMembers enum members, their name and representative number (abc = 5)
-	 * \return the EnumHolder struct
-	 */
+	// 创建一个 EnumHolder
 	static EnumHolder createEnum(
 		const std::string& enumName, 
 		const std::string& enumType, 
@@ -239,15 +189,7 @@ public:
 		enumMembers
 	);
 
-	/**
-	 * \brief creates a FunctionHolder 
-	 * \param owningClass the owning class' or struct name this function resides in
-	 * \param functionName the name of the function e.g getWeapon
-	 * \param functionFlags flags how to call the function e.g Blueprint|Static|abc
-	 * \param functionOffset offset of the function within the binary
-	 * \param returnType the return type, if there's no, pass void
-	 * \param functionParams the function params with their type and name
-	 */
+	// 创建一个 FunctionHolder
 	static void createFunction(
 		ClassHolder& owningClass,
 		const std::string& functionName,
@@ -258,21 +200,13 @@ public:
 		std::string>>&functionParams = {}
 	);
 
-	/**
-	 * \brief bakes a ClassHolder which gets later dumped
-	 * \param classHolder the classHolder that should get baked
-	 */
+	// 烘焙一个稍后将被转储的 ClassHolder
 	static void bakeStructOrClass(ClassHolder& classHolder);
 
-	/**
-	 * \brief bakes a EnumHolder which gets later dumped
-	 * \param enumHolder the enumHolder that should get baked
-	 */
+	// 烘焙一个稍后将被转储的 EnumHolder
 	static void bakeEnum(EnumHolder& enumHolder);
 
 
-	/**
-	 * \brief dumps all baked information to disk. This should be the final step
-	 */
+	// 将所有烘焙的信息转储到磁盘。这应该是最后一步
 	static void dump();
 };
