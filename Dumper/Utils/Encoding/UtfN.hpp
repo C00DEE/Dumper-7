@@ -1,11 +1,11 @@
 #pragma once
 
-// 为STL编译降低警告级别并关闭某些警告
+// Lower warning-level and turn off certain warnings for STL compilation
 #if (defined(_MSC_VER))
-#pragma warning (push, 2) // 推入警告并将警告级别设置为2
-#pragma warning(disable : 4365) // 有符号/无符号不匹配
-#pragma warning(disable : 4710) // 'FunctionName' 未内联
-#pragma warning(disable : 4711) // 'FunctionName' 已选择用于自动内联扩展
+#pragma warning (push, 2) // Push warnings and set warn-level to 2
+#pragma warning(disable : 4365) // signed/unsigned mismatch
+#pragma warning(disable : 4710) // 'FunctionName' was not inlined
+#pragma warning(disable : 4711) // 'FunctionName' selected for automatic inline expansion
 #elif (defined(__CLANG__) || defined(__GNUC__))
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wsign-compare"
@@ -21,7 +21,7 @@
 #endif // _DEBUG
 
 
-// 在 STL 包含后恢复警告级别
+// Restore warnings-levels after STL includes
 #if (defined(_MSC_VER))
 #pragma warning (pop)
 #elif (defined(__CLANG__) || defined(__GNUC__))
@@ -32,11 +32,11 @@
 
 #if (defined(_MSC_VER))
 #pragma warning (push)
-#pragma warning (disable: 4514) // C4514 "未引用的内联函数已被移除"
-#pragma warning (disable: 4820) // C4820 "在数据成员'...'后添加了'n'字节的填充"
-#pragma warning(disable : 4127) // C4127 条件表达式是常量
-#pragma warning(disable : 5045) // C5045 如果指定了/Qspectre开关，编译器将为内存加载插入Spectre缓解措施
-#pragma warning(disable : 5246) // C5246 'ArrayVariable'子对象的初始化应包含在花括号中
+#pragma warning (disable: 4514) // C4514 "unreferenced inline function has been removed"
+#pragma warning (disable: 4820) // C4820 "'n' bytes padding added after data member '...'"
+#pragma warning(disable : 4127) // C4127 conditional expression is constant
+#pragma warning(disable : 5045) // C5045 Compiler will insert Spectre mitigation for memory load if /Qspectre switch specified
+#pragma warning(disable : 5246) // C5246 'ArrayVariable' the initialization of a subobject should be wrapped in braces
 #elif (defined(__CLANG__) || defined(__GNUC__))
 #endif // Warnings
 
@@ -126,7 +126,7 @@ namespace UtfN
 				return static_cast<value_type>(Value & static_cast<flag_type>(~Flag));
 			}
 
-			// 不添加/删除 cv 限定符
+			// Does not add/remove cv-qualifiers
 			template<typename target_type, typename current_type>
 			UTF_CONSTEXPR UTF_NODISCARD
 				auto ForceCastIfMissmatch(current_type&& Arg) -> std::enable_if_t<std::is_same<std::decay_t<target_type>, std::decay_t<current_type>>::value, current_type>
@@ -134,7 +134,7 @@ namespace UtfN
 				return static_cast<current_type>(Arg);
 			}
 
-			// 不添加/删除 cv 限定符
+			// Does not add/remove cv-qualifiers
 			template<typename target_type, typename current_type>
 			UTF_CONSTEXPR UTF_NODISCARD
 				auto ForceCastIfMissmatch(current_type&& Arg) -> std::enable_if_t<!std::is_same<std::decay_t<target_type>, std::decay_t<current_type>>::value, target_type>
@@ -143,35 +143,35 @@ namespace UtfN
 			}
 		}
 
-		// wchar_t 在 windows 上是 utf16 码点，在 linux 上是 utf32
+		// wchar_t is a utf16 codepoint on windows, utf32 on linux
 		UTF_CONSTEXPR bool IsWCharUtf32 = sizeof(wchar_t) == 0x4;
 
-		// 任何大于此值的值都不是有效的 Unicode 符号
+		// Any value greater than this is not a valid Unicode symbol
 		UTF_CONSTEXPR utf_cp32_t MaxValidUnicodeChar = 0x10FFFF;
 
 		namespace Utf8
 		{
 			/*
-			* n 字节 utf8 字符的可用位数和最大值
+			* Available bits, and max values, for n-byte utf8 characters
 			*
-			* 01111111 -> 1 字节 -> 7 位
-			* 11011111 -> 2 字节 -> 5 + 6 位 -> 11 位
-			* 11101111 -> 3 字节 -> 4 + 6 + 6 位 -> 16 位
-			* 11110111 -> 4 字节 -> 3 + 6 + 6 + 6 位 -> 21 位
+			* 01111111 -> 1 byte  -> 7 bits
+			* 11011111 -> 2 bytes -> 5 + 6 bits -> 11 bits
+			* 11101111 -> 3 bytes -> 4 + 6 + 6 bits -> 16 bits
+			* 11110111 -> 4 bytes -> 3 + 6 + 6 + 6 bits -> 21 bits
 			*
-			* 10111111 -> 后续字节
+			* 10111111 -> follow up byte
 			*/
-			UTF_CONSTEXPR utf_cp32_t Max1ByteValue = (1 <<  7) - 1; // 7 位可用
-			UTF_CONSTEXPR utf_cp32_t Max2ByteValue = (1 << 11) - 1; // 11 位可用
-			UTF_CONSTEXPR utf_cp32_t Max3ByteValue = (1 << 16) - 1; // 16 位可用
-			UTF_CONSTEXPR utf_cp32_t Max4ByteValue = 0x10FFFF;      // 21 位可用，但未完全使用
+			UTF_CONSTEXPR utf_cp32_t Max1ByteValue = (1 <<  7) - 1; //  7 bits available
+			UTF_CONSTEXPR utf_cp32_t Max2ByteValue = (1 << 11) - 1; // 11 bits available
+			UTF_CONSTEXPR utf_cp32_t Max3ByteValue = (1 << 16) - 1; // 16 bits available
+			UTF_CONSTEXPR utf_cp32_t Max4ByteValue = 0x10FFFF;      // 21 bits available, but not fully used
 
-			// 多字节 utf8 字符的后续字节标志
+			// Flags for follow-up bytes of multibyte utf8 character
 			UTF_CONSTEXPR utf_cp8_t FollowupByteMask = 0b1000'0000;
 			UTF_CONSTEXPR utf_cp8_t FollowupByteDataMask = 0b0011'1111;
 			UTF_CONSTEXPR utf_cp8_t NumDataBitsInFollowupByte = 0x6;
 
-			// 多字节 utf8 字符的起始字节标志
+			// Flags for start-bytes of multibyte utf8 characters
 			UTF_CONSTEXPR utf_cp8_t TwoByteFlag = 0b1100'0000;
 			UTF_CONSTEXPR utf_cp8_t ThreeByteFlag = 0b1110'0000;
 			UTF_CONSTEXPR utf_cp8_t FourByteFlag = 0b1111'0000;
@@ -179,7 +179,7 @@ namespace UtfN
 			UTF_CONSTEXPR UTF_NODISCARD
 				bool IsValidFollowupCodepoint(const utf_cp8_t Codepoint) noexcept
 			{
-				// 测试高 2 位是否为后续字节掩码
+				// Test the upper 2 bytes for the FollowupByteMask
 				return (Codepoint & 0b1100'0000) == FollowupByteMask;
 			}
 
@@ -219,13 +219,13 @@ namespace UtfN
 
 		namespace Utf16
 		{
-			// 多字节 utf16 字符的代理项掩码和偏移量
+			// Surrogate masks and offset for multibyte utf16 characters
 			UTF_CONSTEXPR utf_cp16_t HighSurrogateRangeStart = 0xD800;
 			UTF_CONSTEXPR utf_cp16_t LowerSurrogateRangeStart = 0xDC00;
 
 			UTF_CONSTEXPR utf_cp32_t SurrogatePairOffset = 0x10000;
 
-			// 2 字节 utf16 值的 Unicode 范围
+			// Unicode range for 2byte utf16 values
 			UTF_CONSTEXPR utf_cp32_t SurrogateRangeLowerBounds = 0xD800;
 			UTF_CONSTEXPR utf_cp32_t SurrogateRangeUpperBounds = 0xDFFF;
 
@@ -233,70 +233,60 @@ namespace UtfN
 			UTF_CONSTEXPR UTF_NODISCARD
 				bool IsHighSurrogate(const utf_cp16_t Codepoint) noexcept
 			{
-				// 范围 [0xD800 - 0xDC00[
+				// Range [0xD800 - 0xDC00[
 				return Codepoint >= HighSurrogateRangeStart && Codepoint < LowerSurrogateRangeStart;
 			}
 			UTF_CONSTEXPR UTF_NODISCARD
 				bool IsLowSurrogate(const utf_cp16_t Codepoint) noexcept
 			{
-				// 范围 [0xDC00 - 0xDFFF]
+				// Range [0xDC00 - 0xDFFF]
 				return Codepoint >= LowerSurrogateRangeStart && Codepoint <= SurrogateRangeUpperBounds;
 			}
 
-			// 测试 utf16 值是否为有效的 Unicode 字符
+			// Tests if a utf16 value is a valid Unicode character
 			UTF_CONSTEXPR UTF_NODISCARD
 				bool IsValidUnicodeChar(const utf_cp16_t LowerCodepoint, const utf_cp16_t UpperCodepoint) noexcept
 			{
 				const bool IsValidHighSurrogate = IsHighSurrogate(UpperCodepoint);
+				const bool IsValidLowSurrogate = IsLowSurrogate(LowerCodepoint);
 
+				// Both needt to be valid
 				if (IsValidHighSurrogate)
-					return IsLowSurrogate(LowerCodepoint); // 如果是高代理项，则下一个必须是低代理项
+					return IsValidLowSurrogate;
 
-				// 如果不是高代理项，则下一个不能是任何代理项
-				return !IsLowSurrogate(LowerCodepoint);
+				// Neither are valid && the codepoints are not in the wrong surrogate ranges
+				return !IsValidLowSurrogate && !IsHighSurrogate(LowerCodepoint) && !IsLowSurrogate(UpperCodepoint);
 			}
 		}
 
 		namespace Utf32
 		{
-			// 检查 utf32 值是否为有效的 Unicode 字符
+			// Tests if a utf32 value is a valid Unicode character
 			UTF_CONSTEXPR UTF_NODISCARD
 				bool IsValidUnicodeChar(const utf_cp32_t Codepoint) noexcept
 			{
-				// 代理项对的值无效
-				return Codepoint < Utf16::SurrogateRangeLowerBounds || Codepoint > Utf16::SurrogateRangeUpperBounds;
+				// Codepoints must be within the valid unicode range and must not be within the range of Surrogate-values
+				return Codepoint < MaxValidUnicodeChar && (Codepoint < Utf16::SurrogateRangeLowerBounds || Codepoint > Utf16::SurrogateRangeUpperBounds);
 			}
 		}
 
 		namespace Iterator
 		{
-			// 基类，用于访问受保护的成员
 			template<typename child_type>
 			class utf_char_iterator_base_child_acessor
 			{
-			protected:
-				friend child_type;
-
-				// 使用SFINAE检查子类是否具有 'ReadChar' 函数
 			private:
-				template<typename T>
-				static auto TestReadChar(int) -> decltype(std::declval<T>().ReadChar(), std::true_type());
-
-				template<typename T>
-				static auto TestReadChar(long) -> std::false_type;
+				template<class child_iterator_type, typename codepoint_iterator_type, typename utf_char_type>
+				friend class utf_char_iterator_base;
 
 			private:
 				static UTF_CONSTEXPR
-					void ReadChar(child_type* Child)
+					void ReadChar(child_type* This)
 				{
-					UTF_IF_CONSTEXPR (decltype(TestReadChar<child_type>(0))::value)
-					{
-						Child->ReadChar();
-					}
+					return This->ReadChar();
 				}
 			};
 
-			// 所有UTF迭代器的基类
 			template<class child_iterator_type, typename codepoint_iterator_type, typename utf_char_type>
 			class utf_char_iterator_base
 			{
@@ -392,7 +382,7 @@ namespace UtfN
 
 	UTF_CONSTEXPR inline
 		bool operator==(const utf8_bytes Left, const utf8_bytes Right) noexcept
-		{
+	{
 		return Left.Codepoints[0] == Right.Codepoints[0]
 			&& Left.Codepoints[1] == Right.Codepoints[1]
 			&& Left.Codepoints[2] == Right.Codepoints[2]
@@ -400,19 +390,19 @@ namespace UtfN
 	}
 	UTF_CONSTEXPR inline
 		bool operator!=(const utf8_bytes Left, const utf8_bytes Right) noexcept
-		{
-			return !(Left == Right);
-		}
+	{
+		return !(Left == Right);
+	}
 
 	UTF_CONSTEXPR inline
 		bool operator==(const utf16_pair Left, const utf16_pair Right) noexcept
-		{
+	{
 		return Left.Upper == Right.Upper && Left.Lower == Right.Lower;
-		}
+	}
 	UTF_CONSTEXPR inline
 		bool operator!=(const utf16_pair Left, const utf16_pair Right) noexcept
-		{
-			return !(Left == Right);
+	{
+		return !(Left == Right);
 	}
 
 
@@ -548,7 +538,7 @@ namespace UtfN
 		UTF_CONSTEXPR UTF_NODISCARD static uint8_t GetCodepointSize() noexcept;
 	};
 
-			UTF_CONSTEXPR UTF_NODISCARD
+	UTF_CONSTEXPR UTF_NODISCARD
 		uint8_t GetUtf8CharLenght(const utf_cp8_t C) noexcept
 	{
 		using namespace UtfImpl;
@@ -577,7 +567,7 @@ namespace UtfN
 		}
 	}
 
-			UTF_CONSTEXPR UTF_NODISCARD
+	UTF_CONSTEXPR UTF_NODISCARD
 		uint8_t GetUtf16CharLenght(const utf_cp16_t UpperCodepoint) noexcept
 	{
 		if (UtfImpl::Utf16::IsHighSurrogate(UpperCodepoint))
@@ -586,7 +576,7 @@ namespace UtfN
 		return 0x1;
 	}
 
-			UTF_CONSTEXPR UTF_NODISCARD
+	UTF_CONSTEXPR UTF_NODISCARD
 		utf_char16 Utf32ToUtf16Pair(const utf_char32 Character) noexcept
 	{
 		using namespace UtfImpl;
@@ -615,7 +605,7 @@ namespace UtfN
 		return RetCharPair;
 	}
 
-			UTF_CONSTEXPR UTF_NODISCARD
+	UTF_CONSTEXPR UTF_NODISCARD
 		utf_char32 Utf16PairToUtf32(const utf_char16 Character) noexcept
 	{
 		using namespace UtfImpl;
@@ -955,7 +945,7 @@ namespace UtfN
 	template<typename codepoint_type,
 		typename std::enable_if<sizeof(codepoint_type) == 0x4 && std::is_integral<codepoint_type>::value, int>::type = 0
 	>
-			UTF_CONSTEXPR UTF_NODISCARD
+	UTF_CONSTEXPR UTF_NODISCARD
 		utf_char32 ParseUtf32CharFromStr(const codepoint_type* Str)
 	{
 		if (!Str)
@@ -1110,7 +1100,7 @@ namespace UtfN
 	UTF_CONSTEXPR20 UTF_NODISCARD
 		utf16_char_string Utf8StringToUtf16String(utf8_char_type(&StringToConvert)[cstr_lenght])
 	{
-		return Utf8StringToUtf16String<utf16_char_string>(utf8_iterator<const utf8_char_type*>(std::begin(StringToConvert), std::end(StringToConvert)));
+		return Utf32StringToUtf16String<utf16_char_string>(utf8_iterator<const utf8_char_type*>(std::begin(StringToConvert), std::end(StringToConvert)));
 	}
 
 	template<typename utf16_char_string, typename utf8_char_type,
@@ -1119,7 +1109,7 @@ namespace UtfN
 	UTF_CONSTEXPR20 UTF_NODISCARD
 		utf16_char_string Utf8StringToUtf16String(const utf8_char_type* StringToConvert, int NonNullTermiantedLength)
 	{
-		return Utf8StringToUtf16String<utf16_char_string>(utf8_iterator<const utf8_char_type*>(StringToConvert, StringToConvert + NonNullTermiantedLength));
+		return Utf32StringToUtf16String<utf16_char_string>(utf32_iterator<const utf8_char_type*>(StringToConvert, StringToConvert + NonNullTermiantedLength));
 	}
 
 
@@ -1167,10 +1157,10 @@ namespace UtfN
 		return Utf32StringToUtf16String<utf16_char_string>(utf32_iterator<const utf32_char_type*>(std::begin(StringToConvert), std::end(StringToConvert)));
 	}
 
-	template<typename utf16_char_string, typename utf32_char_type, size_t cstr_lenght,
-		typename = utf32_iterator<utf32_char_type*>
+	template<typename utf16_char_string, typename utf32_char_type,
+		typename = utf8_iterator<utf32_char_type*>
 	>
-		UTF_CONSTEXPR20 UTF_NODISCARD
+	UTF_CONSTEXPR20 UTF_NODISCARD
 		utf16_char_string Utf32StringToUtf16String(const utf32_char_type* StringToConvert, int NonNullTermiantedLength)
 	{
 		return Utf32StringToUtf16String<utf16_char_string>(utf32_iterator<const utf32_char_type*>(StringToConvert, StringToConvert + NonNullTermiantedLength));
@@ -1373,13 +1363,13 @@ namespace UtfN
 		return *this;
 	}
 
-		UTF_CONSTEXPR UTF_NODISCARD
+	UTF_CONSTEXPR UTF_NODISCARD
 		bool utf_char<UtfEncodingType::Utf8>::operator==(utf_char8 Other) const noexcept
-		{
+	{
 		return Char == Other.Char;
-		}
+	}
 
-		UTF_CONSTEXPR UTF_NODISCARD
+	UTF_CONSTEXPR UTF_NODISCARD 
 		utf_cp8_t& utf_char<UtfEncodingType::Utf8>::operator[](const uint8_t Index)
 	{
 #ifdef _DEBUG
@@ -1387,9 +1377,9 @@ namespace UtfN
 			throw std::out_of_range("Index was greater than 4!");
 #endif // _DEBUG
 		return Char.Codepoints[Index];
-		}
+	}
 
-		UTF_CONSTEXPR UTF_NODISCARD
+	UTF_CONSTEXPR UTF_NODISCARD
 		const utf_cp8_t& utf_char<UtfEncodingType::Utf8>::operator[](const uint8_t Index) const
 	{
 #ifdef _DEBUG
@@ -1399,7 +1389,7 @@ namespace UtfN
 		return Char.Codepoints[Index];
 	}
 
-		UTF_CONSTEXPR UTF_NODISCARD
+	UTF_CONSTEXPR UTF_NODISCARD
 		bool utf_char<UtfEncodingType::Utf8>::operator!=(utf_char8 Other) const noexcept
 	{
 		return Char != Other.Char;
@@ -1585,13 +1575,13 @@ namespace UtfN
 		return UtfEncodingType::Utf32;
 	}
 
-			UTF_CONSTEXPR UTF_NODISCARD
+	UTF_CONSTEXPR UTF_NODISCARD
 		uint8_t utf_char<UtfEncodingType::Utf32>::GetNumCodepoints() const noexcept
-			{
+	{
 		return 0x1;
-			}
+	}
 
-			UTF_CONSTEXPR UTF_NODISCARD
+	UTF_CONSTEXPR UTF_NODISCARD
 		/* static */ uint8_t utf_char<UtfEncodingType::Utf32>::GetCodepointSize() noexcept
 	{
 		return 0x4;
